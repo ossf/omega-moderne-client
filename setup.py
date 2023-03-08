@@ -13,6 +13,7 @@ if __name__ == "__main__":
         long_description_content_type="text/markdown",
         url="https://github.com/ossf/omega-moderne-client",
         packages=setuptools.find_packages(),
+        include_package_data=True,
         classifiers=[
             "Programming Language :: Python :: 3",
         ],
@@ -25,6 +26,10 @@ if __name__ == "__main__":
                 "rich>=11.0.0",
                 "rich-argparse>=1.0.0",
                 "isodate>=0.6.1",
+            ],
+            "github-scripts": [
+                "croniter>=1.3.8",
+                "pytz>=2022",
             ]
         }
     )
