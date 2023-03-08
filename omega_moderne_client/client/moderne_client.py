@@ -1,10 +1,13 @@
+import abc
 import base64
 import os
-from dataclasses import dataclass
-from typing import List, Any, Dict
+from dataclasses import dataclass, field
+from typing import List, Any, Dict, Optional, TypedDict
 
 from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
+# noinspection PyPackageRequirements
+from graphql import DocumentNode
 
 from omega_moderne_client.campaign.campaign import Campaign
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
@@ -16,11 +19,11 @@ class ModerneClient:
     _client: Client
 
     @staticmethod
-    def load_from_env() -> "ModerneClient":
+    def load_from_env(domain: str = "public.moderne.io") -> "ModerneClient":
         api_token = os.getenv("MODERNE_API_TOKEN")
         if not api_token:
-            raise Exception("`MODERNE_API_TOKEN` environment variable is not set")
-        return ModerneClient.create(api_token)
+            raise ValueError("`MODERNE_API_TOKEN` environment variable is not set")
+        return ModerneClient.create(api_token, domain=domain)
 
     @staticmethod
     def create(moderne_api_token: str, domain: str = "public.moderne.io") -> "ModerneClient":
@@ -63,10 +66,9 @@ class ModerneClient:
         }
         # Execute the query on the transport
         result = self._client.execute(run_fix_query, variable_values=params)
-        print(result)
         return result["runYamlRecipe"]["id"]
 
-    def query_recipe_run_status(self, recipe_run_id: str) -> str:
+    def query_recipe_run_status(self, recipe_run_id: str) -> Dict[str, Any]:
         recipe_run_results = gql(
             # language=GraphQL
             """
@@ -81,6 +83,7 @@ class ModerneClient:
                         totalRepositoriesSuccessful
                         totalRepositoriesWithErrors
                         totalRepositoriesWithResults
+                        totalRepositoriesWithNoChanges
                         totalResults
                         totalTimeSavings
                     }
@@ -90,57 +93,30 @@ class ModerneClient:
         )
         params = {"id": recipe_run_id}
         result = self._client.execute(recipe_run_results, variable_values=params)
-        print(result)
-        return result["recipeRun"]["state"]
+        return result["recipeRun"]
 
-    def query_recipe_run_results(self, recipe_run_id: str) -> List[Dict[str, Any]]:
-        def query_recipient_run_results_page(after: int) -> dict:
-            recipe_run_results = gql(
-                # language=GraphQL
-                """
-                # noinspection GraphQLUnresolvedReference
-                query getRecipeRun($id: ID!, $after: String) {
-                  recipeRun(id: $id) {
-                    id
-                    state
-                    summaryResultsPages(after: $after, filterBy: {statuses: [FINISHED], onlyWithResults:true}) {
-                      pageInfo {
-                        hasNextPage
-                        startCursor
-                        endCursor
-                      }
-                      count
-                      edges {
-                        node {
-                          repository {
-                            origin
-                            path
-                            branch
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                """
-            )
-            params = {
-                "id": recipe_run_id,
-                "after": str(after)
-            }
-            result = self._client.execute(recipe_run_results, variable_values=params)
-            return result["recipeRun"]["summaryResultsPages"]
+    def query_recipe_run(
+            self,
+            recipe_run_id: str,
+            filter_by: Optional[Dict[str, Any]] = None
+    ) -> List['RecipeRunSummary']:
+        return GetRecipeRunSummaryResults(client=self._client).call(recipe_run_id, filter_by=filter_by)
 
-        next_after = -1
-        results: List[Any] = []
-        while True:
-            page = query_recipient_run_results_page(next_after)
-            results.extend([edge["node"]["repository"] for edge in page["edges"]])
-            if not page["pageInfo"]["hasNextPage"]:
-                break
-            next_after = page["pageInfo"]["endCursor"]
+    def query_recipe_run_sorted_by_results(self, recipe_run_id: str) -> List['RecipeRunSummary']:
+        return GetRecipeRunSummaryResults(client=self._client).call(
+            recipe_run_id,
+            order_by={'direction': 'DESC', 'field': 'TOTAL_RESULTS'}
+        )
 
-        return results
+    def query_recipe_run_repositories(
+            self,
+            recipe_run_id: str,
+            filter_by: Optional[Dict[str, Any]] = None
+    ) -> List['Repository']:
+        return [summary['repository'] for summary in self.query_recipe_run(recipe_run_id, filter_by)]
+
+    def query_recipe_run_results_repositories(self, recipe_run_id: str) -> List[Dict[str, Any]]:
+        return self.query_recipe_run_repositories(recipe_run_id, {'statuses': ['FINISHED'], 'onlyWithResults': True})
 
     def fork_and_pull_request(
             self,
@@ -191,78 +167,229 @@ class ModerneClient:
             "pullRequestTitle": campaign.pr_title,
             "pullRequestBody": base64.b64encode(campaign.pr_body.encode()).decode()
         }
-        # Execute the query on the transport
-        # print(json.dumps(params, indent=4))
         result = self._client.execute(fork_and_pull_request_query, variable_values=params)
-        print(result)
         return result["forkAndPullRequest"]["id"]
 
-    def query_commit_job_status(self, commit_job_id: str) -> str:
-        def query_commit_job_status_page(after: int) -> dict:
-            commit_job_status_query = gql(
-                # language=GraphQL
-                """
-                # noinspection GraphQLUnresolvedReference
-                query getCommitJob($id: ID!, $after: String) {
-                    commitJob(id: $id) {
-                        id
-                        completed
-                        commits(after: $after) {
-                            pageInfo {
-                                hasNextPage
-                                startCursor
-                                endCursor
+    def query_commit_job_commits(self, commit_job_id: str) -> List[Dict[str, Any]]:
+        return GetCommitJobCommits(client=self._client).call(commit_job_id)
+
+    def query_commit_job_with_summary(self, commit_job_id: str) -> Dict[str, Any]:
+        commit_job_summary_query = gql(
+            # language=GraphQL
+            """
+            # noinspection GraphQLUnresolvedReference
+            query getCommitJob($id: ID!) {
+                commitJob(id: $id) {
+                    id
+                    completed
+                    summaryResults {
+                        count
+                        failedCount
+                        noChangeCount
+                        successfulCount
+                    }
+                }
+            }
+            """
+        )
+        params = {"id": commit_job_id}
+        result = self._client.execute(
+            commit_job_summary_query,
+            variable_values=params
+        )
+        return result["commitJob"]
+
+    def query_commit_job_status(self, commit_job_id: str) -> Dict[str, Any]:
+        results: List[Dict[str, Any]] = self.query_commit_job_commits(commit_job_id)
+        commit_job = self.query_commit_job_with_summary(commit_job_id)
+        summary_results = commit_job["summaryResults"]
+        state: str
+        if "state" in commit_job:
+            # Not currently supported, but hopefully will be in the future.
+            # https://linuxfoundation.slack.com/archives/C04HR6EJ38D/p1678137720981939
+            state = commit_job["state"]
+        elif "CANCELED" in (node["state"] for node in results):
+            # TODO: This is a hack, we should be able to get the state from the commit job
+            state = "CANCELED"
+        elif summary_results["count"] == commit_job["completed"]:
+            state = "COMPLETED"
+        elif summary_results["failedCount"] + summary_results["noChangeCount"] + summary_results["successfulCount"] < \
+                summary_results["count"]:
+            state = "RUNNING"
+        else:
+            state = "COMPLETED"
+
+        commit_job["commits"] = results
+        commit_job["state"] = state
+        return commit_job
+
+
+@dataclass(frozen=True)
+class PagedQuery(abc.ABC):
+    client: Client
+    query: DocumentNode
+
+    @abc.abstractmethod
+    def get_paged(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+
+    def page(self, after: str, **kwargs) -> dict:
+        """
+        Execute a paged query. Return the page of results.
+        """
+        params = {"after": after}
+        params.update(kwargs)
+        return self.client.execute(self.query, variable_values=params)
+
+    def all(self, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Take a paged query and return all results.
+        """
+        next_after = None
+        results: List[Dict[str, Any]] = []
+        while True:
+            page = self.page(next_after, **kwargs)
+            paged = self.get_paged(page)
+            results.extend([edge["node"] for edge in paged["edges"]])
+            if not paged["pageInfo"]["hasNextPage"]:
+                break
+            next_after = paged["pageInfo"]["endCursor"]
+        return results
+
+
+@dataclass(frozen=True)
+class GetRecipeRunSummaryResults(PagedQuery):
+    query: DocumentNode = field(default=gql(
+        # language=GraphQL
+        """
+        # noinspection GraphQLUnresolvedReference
+        query getRecipeRun(
+            $id: ID!,
+            $after: String,
+            $filterBy: SummaryResultsFilterInput,
+            $orderBy: SummaryResultsOrderInput
+        ) {
+          recipeRun(id: $id) {
+            id
+            state
+            summaryResultsPages(after: $after, filterBy: $filterBy, orderBy: $orderBy) {
+              pageInfo {
+                hasNextPage
+                startCursor
+                endCursor
+              }
+              count
+              edges {
+                node {
+                  debugMarkers
+                  errorMarkers
+                  infoMarkers
+                  warningMarkers
+                  timeSavings
+                  totalChanged
+                  totalSearched
+                  state
+                  performance {
+                    recipeRun
+                  }
+                  repository {
+                    origin
+                    path
+                    branch
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+    ))
+
+    def call(
+            self,
+            recipe_run_id: str,
+            filter_by: Dict[str, Any] = None,
+            order_by: Dict[str, Any] = None,
+    ) -> List['RecipeRunSummary']:
+        args = {"id": recipe_run_id}
+        if filter_by:
+            args["filterBy"] = filter_by
+        if order_by:
+            args["orderBy"] = order_by
+        return self.all(**args)
+
+    def get_paged(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        return data["recipeRun"]["summaryResultsPages"]
+
+
+class RecipeRunSummary(TypedDict):
+    debugMarkers: int
+    errorMarkers: int
+    infoMarkers: int
+    warningMarkers: int
+    timeSavings: str
+    totalChanged: int
+    totalSearched: int
+    state: str
+    performance: 'RecipeRunPerformance'
+    repository: 'Repository'
+
+
+class RecipeRunPerformance(TypedDict):
+    recipeRun: str
+
+
+class Repository(TypedDict):
+    origin: str
+    path: str
+    branch: str
+
+
+@dataclass(frozen=True)
+class GetCommitJobCommits(PagedQuery):
+    query: DocumentNode = field(default=gql(
+        # language=GraphQL
+        """
+        # noinspection GraphQLUnresolvedReference
+        query getCommitJob($id: ID!, $after: String) {
+            commitJob(id: $id) {
+                id
+                completed
+                commits(after: $after) {
+                    pageInfo {
+                        hasNextPage
+                        startCursor
+                        endCursor
+                    }
+                    count
+                    edges {
+                        node {
+                            modified
+                            repository {
+                                origin
+                                path
+                                branch
+                                weight
                             }
-                            count
-                            edges {
-                                node {
-                                    modified
-                                    repository {
-                                        origin
-                                        path
-                                        branch
-                                        weight
-                                    }
-                                    resultLink
-                                    state
-                                    stateMessage
-                                }
-                            }
-                        }
-                        summaryResults {
-                            count
-                            failedCount
-                            noChangeCount
-                            successfulCount
+                            resultLink
+                            state
+                            stateMessage
                         }
                     }
                 }
-                """
-            )
-            params = {
-                "id": commit_job_id
+                summaryResults {
+                    count
+                    failedCount
+                    noChangeCount
+                    successfulCount
+                }
             }
-            if after is not None:
-                params["after"] = str(after)
-            result = self._client.execute(commit_job_status_query, variable_values=params)
-            print(result)
-            return result
+        }
+        """
+    ))
 
-        next_after = None
-        results: List[Any] = []
-        while True:
-            commit_status = query_commit_job_status_page(next_after)["commitJob"]
-            page = commit_status["commits"]
-            results.extend([edge["node"] for edge in page["edges"]])
-            if not page["pageInfo"]["hasNextPage"]:
-                break
-            next_after = page["pageInfo"]["endCursor"]
-        summary_results = commit_status["summaryResults"]
-        print(f"Summary results: {summary_results}")
-        if summary_results["count"] == commit_status["completed"]:
-            return "COMPLETED"
-        elif summary_results["failedCount"] + summary_results["noChangeCount"] + summary_results["successfulCount"] < \
-                summary_results["count"]:
-            return "RUNNING"
-        else:
-            return "COMPLETED"
+    def call(self, commit_job_id: str) -> List[Dict[str, Any]]:
+        return self.all(**{"id": commit_job_id})
+
+    def get_paged(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        return data["commitJob"]["commits"]

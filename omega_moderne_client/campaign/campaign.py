@@ -67,25 +67,25 @@ class Campaign:
 
     @classmethod
     def _load_campaign_resource(cls, campaign: str, path: str) -> Traversable:
-        # noinspection PyArgumentList
+        # pylint: disable-next=too-many-function-args
         resource = cls._campaigns_dir().joinpath(
             campaign,
             path
         )
         if not resource.is_file():
-            raise Exception(f"File {path} does not exist, and must to create a campaign")
+            raise ValueError(f"File {path} does not exist, and must to create a campaign")
         return resource
 
     @classmethod
     def _load_file_contents(cls, campaign: str, path: str) -> str:
         resource = cls._load_campaign_resource(campaign, path)
         # noinspection PyTypeChecker
-        with open(resource, 'r') as f:
-            return f.read()
+        with open(resource, 'r', encoding='utf-8') as file:
+            return file.read()
 
     @classmethod
     def _load_file_contents_as_title_and_body(cls, campaign: str, path: str) -> Tuple[str, str]:
         resource = cls._load_campaign_resource(campaign, path)
         # noinspection PyTypeChecker
-        with open(resource, 'r') as f:
-            return f.readline(), f.read()
+        with open(resource, 'r', encoding='utf-8') as file:
+            return file.readline(), file.read()

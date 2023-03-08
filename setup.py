@@ -20,4 +20,11 @@ if __name__ == "__main__":
         install_requires=[
           "gql[all]>=3.4.0"
         ],
+        extras_require={
+            "cli": [
+                "rich>=11.0.0",
+                "rich-argparse>=1.0.0",
+                "isodate>=0.6.1",
+            ]
+        }
     )
