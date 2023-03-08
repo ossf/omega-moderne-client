@@ -20,5 +20,5 @@ class GpgKeyConfig:
     def _load_env_variable(env_name: str) -> str:
         env = os.getenv(env_name)
         if not env:
-            raise Exception(f"{env_name} environment variable is not set")
+            raise ValueError(f"{env_name} environment variable is not set")
         return env

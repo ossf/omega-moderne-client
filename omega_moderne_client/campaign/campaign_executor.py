@@ -1,67 +1,140 @@
+import abc
 import time
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any, List, Dict
 
-from .campaign import Campaign
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
-from omega_moderne_client.client.moderne_client import ModerneClient
+from omega_moderne_client.client.moderne_client import ModerneClient, RecipeRunSummary
+from .campaign import Campaign
 
 
 @dataclass(frozen=True)
 class CampaignExecutor:
-    campaign: Campaign
     client: ModerneClient
+    progress_monitor: 'CampaignExecutorProgressMonitor'
 
-    def execute_recipe_and_await(
-            self,
-            target_organization_id="Default"
-    ) -> 'RecipeExecutionResult':
-        print(f"Running campaign {self.campaign.name}...")
+    def launch_recipe(self, campaign: Campaign, target_organization_id="Default"):
         run_id = self.client.run_campaign(
-            self.campaign,
+            campaign,
             target_organization_id=target_organization_id
         )
-        print(f"Waiting for recipe run {run_id} to complete...")
-        print(f"View live on Moderne https://{self.client.domain}/results/{run_id}")
+        self.progress_monitor.on_recipe_run_started(run_id)
+        return run_id
 
+    def await_recipe(self, run_id: str) -> 'RecipeExecutionResult':
+        previous = {}
         while True:
-            state = self.client.query_recipe_run_status(run_id)
-            print(f"Recipe {run_id} state: {state}")
-            if state == "FINISHED":
-                print("Recipe run FINISHED")
-                break
-            elif state == "CANCELED":
-                print("Recipe run CANCELED")
+            status = self.client.query_recipe_run_status(run_id)
+            state = status["state"]
+            if status != previous:
+                # Only print if the status has changed
+                recipe_run_summaries = self.client.query_recipe_run_sorted_by_results(run_id)
+                self.progress_monitor.on_recipe_progress(run_id, state, status["totals"], recipe_run_summaries)
+                previous = status
+            if state in ("FINISHED", "CANCELED"):
+                self.progress_monitor.on_recipe_run_completed(run_id, state)
                 break
             time.sleep(5)
 
-        print(f"Querying recipe run {run_id} results...")
-        repositories = self.client.query_recipe_run_results(run_id)
-        return RecipeExecutionResult(run_id=run_id, repositories=repositories)
+        repositories_with_results = self.client.query_recipe_run_results_repositories(run_id)
+        return RecipeExecutionResult(run_id=run_id, repositories=repositories_with_results)
 
-    def execute_pull_request_generation(
+    def launch_pull_request(
             self,
+            campaign: Campaign,
             gpg_key_config: GpgKeyConfig,
-            recipe_execution_result: 'RecipeExecutionResult',
-    ):
-        print(f"Forking and creating pull requests for campaign {self.campaign.name}...")
+            recipe_execution_result: 'RecipeExecutionResult'
+    ) -> str:
         commit_id = self.client.fork_and_pull_request(
             recipe_execution_result.run_id,
-            self.campaign,
+            campaign,
             gpg_key_config,
             recipe_execution_result.repositories
         )
-        print(f"Waiting for commit job {commit_id} to complete...")
+        self.progress_monitor.on_pull_request_generation_started(commit_id)
+        return commit_id
+
+    def await_pull_request(self, commit_id: str):
         while True:
-            status = self.client.query_commit_job_status(commit_id)
-            if status == "COMPLETED":
-                print("Commit job COMPLETED")
+            job_state = self.client.query_commit_job_with_summary(commit_id)
+            state = job_state["state"]
+            self.progress_monitor.on_pull_request_generation_progress(commit_id, state, job_state["commits"])
+            if state != "RUNNING":
+                self.progress_monitor.on_pull_request_generation_completed(commit_id, state)
                 break
             time.sleep(5)
-        print(f'Campaign {self.campaign.name} completed!')
 
 
 @dataclass(frozen=True)
 class RecipeExecutionResult:
     run_id: str
     repositories: List[Any]
+
+
+class CampaignExecutorProgressMonitor(abc.ABC):
+
+    @abc.abstractmethod
+    def on_recipe_run_started(self, run_id: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def on_recipe_progress(
+            self,
+            run_id: str,
+            state: str,
+            totals: Dict[str, Any],
+            repository_run_summaries: List['RecipeRunSummary']
+    ) -> None:
+        pass
+
+    @abc.abstractmethod
+    def on_recipe_run_completed(self, run_id: str, state: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def on_pull_request_generation_started(self, commit_id: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def on_pull_request_generation_progress(self, commit_id: str, state: str, commits: Dict[str, Any]) -> None:
+        pass
+
+    @abc.abstractmethod
+    def on_pull_request_generation_completed(self, commit_id: str, state: str) -> None:
+        pass
+
+
+@dataclass(frozen=True)
+class PrintingCampaignExecutorProgressMonitor(CampaignExecutorProgressMonitor):
+    domain: str
+
+    # noinspection PyMethodMayBeStatic
+    def print(self, *args):
+        print(*args)
+
+    def on_recipe_run_started(self, run_id: str) -> None:
+        self.print(f"Waiting for recipe run {run_id} to complete...")
+        self.print(f"View live on Moderne https://{self.domain}/results/{run_id}")
+
+    def on_recipe_progress(
+            self,
+            run_id: str,
+            state: str,
+            totals: Dict[str, Any],
+            repository_run_summaries: List['RecipeRunSummary']
+    ) -> None:
+        self.print(f"Recipe {run_id} state: {state} totals: ", totals)
+
+    def on_recipe_run_completed(self, run_id: str, state: str) -> None:
+        self.print(f"Recipe run {state}")
+        self.print(f"Querying recipe run {run_id} results...")
+
+    def on_pull_request_generation_started(self, commit_id: str) -> None:
+        self.print(f"Waiting for commit job {commit_id} to complete...")
+        self.print(f"View live on Moderne https://{self.domain}/commits/{commit_id}")
+
+    def on_pull_request_generation_progress(self, commit_id: str, state: str, commits: Dict[str, Any]) -> None:
+        self.print(f"Commit job {commit_id} state: {state} commits:", commits)
+
+    def on_pull_request_generation_completed(self, commit_id: str, state: str) -> None:
+        self.print(f"Pull request generation for commit run {commit_id} completed with state {state}")
