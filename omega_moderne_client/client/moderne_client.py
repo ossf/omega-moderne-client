@@ -40,19 +40,20 @@ class ModerneClient:
             )
         )
 
-    def run_campaign(self, campaign: Campaign, target_organization_id: str = "Default") -> str:
+    def run_campaign(self, campaign: Campaign, target_organization_id: str = "Default", priority: str = "LOW") -> str:
         """
         Runs a campaign on the target organization.
         :param campaign: The campaign to execute.
         :param target_organization_id: The Moderne SaaS organization to run the campaign on.
+        :param priority: The priority of the campaign. Can be one of "LOW" or "NORMAL".
         :return: The id of the recipe.
         """
         run_fix_query = gql(
             # language=GraphQL
             """
             # noinspection GraphQLUnresolvedReference
-            mutation runSecurityFix($organizationId: ID, $yaml: Base64!) {
-              runYamlRecipe(organizationId: $organizationId, yaml: $yaml) {
+            mutation runSecurityFix($organizationId: ID, $yaml: Base64!, $priority: RunRecipePriority) {
+              runYamlRecipe(organizationId: $organizationId, yaml: $yaml, priority: $priority) {
                 id
                 start
               }
@@ -62,7 +63,8 @@ class ModerneClient:
 
         params = {
             "organizationId": target_organization_id,
-            "yaml": campaign.get_recipe_yaml_base_64()
+            "yaml": campaign.get_recipe_yaml_base_64(),
+            "priority": priority
         }
         # Execute the query on the transport
         result = self._client.execute(run_fix_query, variable_values=params)
