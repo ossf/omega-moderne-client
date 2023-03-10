@@ -10,7 +10,6 @@ on:
 
 jobs:
   run-campaign:
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/recurring-campaign-base.yml
     with:
       campaign_identifier: ${{ github.event.inputs.campaign_identifier }}
