@@ -1,0 +1,57 @@
+---
+name: recurring-campaign-base
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      campaign_identifier:
+        description: "The identifier of the campaign to run"
+        required: true
+        type: string
+    secrets:
+      github_token_for_moderne:
+        description: "The GitHub token to use when generating pull requests"
+        required: true
+      moderne_token:
+        description: "The Moderne token to use to authenticate with Moderne"
+        required: true
+      gpg_public_key:
+        description: "The GPG public key to use when signing commits"
+        required: true
+      gpg_private_key:
+        description: "The GPG private key to use when signing commits"
+        required: true
+      gpg_private_key_password:
+        description: "The password for the GPG private key"
+        required: true
+
+env:
+  GITHUB_TOKEN_FOR_MODERNE: ${{ secrets.github_token_for_moderne }}
+  MODERNE_API_TOKEN: ${{ secrets.moderne_token }}
+  GPG_KEY_PUBLIC_KEY: ${{ secrets.gpg_public_key }}
+  GPG_KEY_PRIVATE_KEY: ${{ secrets.gpg_private_key }}
+  GPG_KEY_PASSPHRASE: ${{ secrets.gpg_private_key_password }}
+
+jobs:
+  run-campaign:
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install `omega-moderne-client`
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[cli]
+      - name: Run campaign
+        run: |
+          ./omega-moderne-client run-recipe {{ inputs.campaign_identifier }} --moderne-organization Default
