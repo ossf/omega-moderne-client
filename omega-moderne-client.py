@@ -4,7 +4,6 @@
 import argparse
 import base64
 import json
-import os
 import sys
 from dataclasses import dataclass
 from typing import Dict, Any, List
@@ -26,12 +25,7 @@ from omega_moderne_client.client.moderne_client import ModerneClient, Repository
 from omega_moderne_client.util import verbose_timedelta, headers
 
 console = Console()
-# Credit: https://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Omega%20Moderne%0A%20%20%20%20%20%20%20Client
-header: str
-if console.width < 80 or "CI" in os.environ:
-    header = headers.HEADER_NARROW
-else:
-    header = headers.HEADER_NORMAL
+header = headers.HEADER_NORMAL
 layout = Layout()
 layout.split(
     Layout(name='header', size=17),

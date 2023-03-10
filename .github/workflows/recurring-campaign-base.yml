@@ -34,6 +34,8 @@ env:
   GPG_KEY_PUBLIC_KEY: ${{ secrets.gpg_public_key }}
   GPG_KEY_PRIVATE_KEY: ${{ secrets.gpg_private_key }}
   GPG_KEY_PASSPHRASE: ${{ secrets.gpg_private_key_password }}
+  # Set `COLUMNS` for rich output: https://github.com/Textualize/rich/issues/2769
+  COLUMNS: 120
 
 jobs:
   run-campaign:
