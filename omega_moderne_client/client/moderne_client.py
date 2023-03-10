@@ -52,7 +52,7 @@ class ModerneClient:
             # language=GraphQL
             """
             # noinspection GraphQLUnresolvedReference
-            mutation runSecurityFix($organizationId: ID, $yaml: Base64!, $priority: RunRecipePriority) {
+            mutation runSecurityFix($organizationId: ID, $yaml: Base64!, $priority: RecipeRunPriority) {
               runYamlRecipe(organizationId: $organizationId, yaml: $yaml, priority: $priority) {
                 id
                 start
@@ -102,12 +102,16 @@ class ModerneClient:
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None
     ) -> List['RecipeRunSummary']:
-        return GetRecipeRunSummaryResults(client=self._client).call(recipe_run_id, filter_by=filter_by)
+        return GetRecipeRunSummaryResults(client=self._client).get_all(recipe_run_id, filter_by=filter_by)
 
     def query_recipe_run_sorted_by_results(self, recipe_run_id: str) -> List['RecipeRunSummary']:
-        return GetRecipeRunSummaryResults(client=self._client).call(
+        return GetRecipeRunSummaryResults(client=self._client).get_all(
             recipe_run_id,
+            filter_by={'statuses': ['FINISHED'], 'onlyWithResults': True},
             order_by={'direction': 'DESC', 'field': 'TOTAL_RESULTS'}
+        ) + GetRecipeRunSummaryResults(client=self._client).get_first_page(
+            recipe_run_id,
+            filter_by={'statuses': ['ERROR', 'LOADING', 'QUEUED', 'RUNNING', 'CREATED', 'UNAVAILABLE']},
         )
 
     def query_recipe_run_repositories(
@@ -232,10 +236,10 @@ class PagedQuery(abc.ABC):
     query: DocumentNode
 
     @abc.abstractmethod
-    def get_paged(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         pass
 
-    def page(self, after: str, **kwargs) -> dict:
+    def request_page(self, after: str, **kwargs) -> dict:
         """
         Execute a paged query. Return the page of results.
         """
@@ -243,20 +247,26 @@ class PagedQuery(abc.ABC):
         params.update(kwargs)
         return self.client.execute(self.query, variable_values=params)
 
-    def all(self, **kwargs) -> List[Dict[str, Any]]:
+    def request_all(self, **kwargs) -> List[Dict[str, Any]]:
         """
         Take a paged query and return all results.
         """
         next_after = None
         results: List[Dict[str, Any]] = []
         while True:
-            page = self.page(next_after, **kwargs)
-            paged = self.get_paged(page)
+            paged = self.map_page(self.request_page(next_after, **kwargs))
             results.extend([edge["node"] for edge in paged["edges"]])
             if not paged["pageInfo"]["hasNextPage"]:
                 break
             next_after = paged["pageInfo"]["endCursor"]
         return results
+
+    def get_page_results(self, after: str, **kwargs) -> List[Any]:
+        """
+        Execute a paged query. Return the page of results.
+        """
+        paged = self.map_page(self.request_page(after, **kwargs))
+        return [edge["node"] for edge in paged["edges"]]
 
 
 @dataclass(frozen=True)
@@ -307,7 +317,7 @@ class GetRecipeRunSummaryResults(PagedQuery):
         """
     ))
 
-    def call(
+    def get_first_page(
             self,
             recipe_run_id: str,
             filter_by: Dict[str, Any] = None,
@@ -318,9 +328,22 @@ class GetRecipeRunSummaryResults(PagedQuery):
             args["filterBy"] = filter_by
         if order_by:
             args["orderBy"] = order_by
-        return self.all(**args)
+        return self.get_page_results(None, **args)
 
-    def get_paged(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def get_all(
+            self,
+            recipe_run_id: str,
+            filter_by: Dict[str, Any] = None,
+            order_by: Dict[str, Any] = None,
+    ) -> List['RecipeRunSummary']:
+        args = {"id": recipe_run_id}
+        if filter_by:
+            args["filterBy"] = filter_by
+        if order_by:
+            args["orderBy"] = order_by
+        return self.request_all(**args)
+
+    def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["recipeRun"]["summaryResultsPages"]
 
 
@@ -391,7 +414,7 @@ class GetCommitJobCommits(PagedQuery):
     ))
 
     def call(self, commit_job_id: str) -> List[Dict[str, Any]]:
-        return self.all(**{"id": commit_job_id})
+        return self.request_all(**{"id": commit_job_id})
 
-    def get_paged(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["commitJob"]["commits"]
