@@ -8,6 +8,32 @@ automated pull requests to fix vulnerabilities, at-scale, across the entire open
 
 This client can either be used as a standalone script, or as a library.
 
+### Secrets
+
+The client requires a few secrets to be set in the environment:
+
+#### Moderne API Token
+Can either be read from:
+ - `~/.moderne/token.txt` file
+ - `MODERNE_API_TOKEN` environment variable
+
+This is required for all moderne API calls.
+
+#### GitHub API Token
+Can either be read from:
+ - `~/.config/hub` file
+ - `GITHUB_TOKEN_FOR_MODERNE` environment variable
+
+This is required only when attempting to create pull requests.
+
+#### GPG Key
+The following environment variables are required to sign generated commits:
+ - `GPG_KEY_PUBLIC_KEY`
+ - `GPG_KEY_PRIVATE_KEY`
+ - `GPG_KEY_PASSPHRASE`
+
+This is required only when attempting to create pull requests.
+
 ### CLI Usage
 
 To install the CLI dependencies use the following command:

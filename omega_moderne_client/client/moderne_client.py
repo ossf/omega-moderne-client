@@ -2,6 +2,7 @@ import abc
 import base64
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Any, Dict, Optional, TypedDict
 
 from gql import gql, Client
@@ -20,9 +21,20 @@ class ModerneClient:
 
     @staticmethod
     def load_from_env(domain: str = "public.moderne.io") -> "ModerneClient":
-        api_token = os.getenv("MODERNE_API_TOKEN")
-        if not api_token:
-            raise ValueError("`MODERNE_API_TOKEN` environment variable is not set")
+        token_file = Path.home().joinpath('.moderne/token.txt')
+        api_token: str
+        if token_file.exists():
+            with open(token_file, 'r', encoding='utf-8') as file:
+                api_token = file.read().strip()
+            if not api_token:
+                raise ValueError(f"Token file {token_file} is empty")
+        else:
+            api_token = os.getenv("MODERNE_API_TOKEN")
+            if not api_token:
+                raise ValueError(
+                    "No token file found at `~/.moderne/token.txt` and " +
+                    "`MODERNE_API_TOKEN` environment variable is not set!"
+                )
         return ModerneClient.create(api_token, domain=domain)
 
     @staticmethod
