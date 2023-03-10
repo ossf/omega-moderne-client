@@ -29,7 +29,7 @@ on:
         required: true
 
 env:
-  GITHUB_TOKEN_FOR_MODERNE: ${{ secrets.github_token_for_moderne }}
+  GITHUB_TOKEN_FOR_MODERNE: ${{ secrets.moderne_github_token }}
   MODERNE_API_TOKEN: ${{ secrets.moderne_token }}
   GPG_KEY_PUBLIC_KEY: ${{ secrets.gpg_public_key }}
   GPG_KEY_PRIVATE_KEY: ${{ secrets.gpg_private_key }}
@@ -53,4 +53,4 @@ jobs:
           pip install .[cli]
       - name: Run campaign
         run: |
-          ./omega-moderne-client run-recipe {{ inputs.campaign_identifier }} --moderne-organization Default
+          ./omega-moderne-client.py run-recipe {{ inputs.campaign_identifier }} --moderne-organization Default
