@@ -1,0 +1,16 @@
+name: manual-run-campaign
+
+on:
+  workflow_dispatch:
+    inputs:
+      campaign_identifier:
+        description: 'Campaign Identifier'
+        required: true
+        type: string
+
+jobs:
+  run-campaign:
+    runs-on: ubuntu-latest
+    uses: ./.github/workflows/recurring-campaign-base.yml
+    with:
+      campaign_identifier: ${{ github.event.inputs.campaign_identifier }}

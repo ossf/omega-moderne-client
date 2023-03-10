@@ -12,7 +12,7 @@ on:
         required: true
         type: string
     secrets:
-      github_token_for_moderne:
+      moderne_github_token:
         description: "The GitHub token to use when generating pull requests"
         required: true
       moderne_token:
