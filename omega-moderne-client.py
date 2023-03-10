@@ -22,27 +22,15 @@ from omega_moderne_client.campaign.campaign import Campaign
 from omega_moderne_client.campaign.campaign_executor import CampaignExecutor, PrintingCampaignExecutorProgressMonitor
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
 from omega_moderne_client.client.moderne_client import ModerneClient, Repository, RecipeRunSummary
-from omega_moderne_client.util import verbose_timedelta
+from omega_moderne_client.util import verbose_timedelta, headers
 
-# Credit: https://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Omega%20Moderne%0A%20%20%20%20%20%20%20Client
-header = """
-╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║    ██████╗ ███╗   ███╗███████╗ ██████╗  █████╗     ███╗   ███╗ ██████╗ ██████╗ ███████╗██████╗ ███╗   ██╗███████╗   ║
-║   ██╔═══██╗████╗ ████║██╔════╝██╔════╝ ██╔══██╗    ████╗ ████║██╔═══██╗██╔══██╗██╔════╝██╔══██╗████╗  ██║██╔════╝   ║
-║   ██║   ██║██╔████╔██║█████╗  ██║  ███╗███████║    ██╔████╔██║██║   ██║██║  ██║█████╗  ██████╔╝██╔██╗ ██║█████╗     ║
-║   ██║   ██║██║╚██╔╝██║██╔══╝  ██║   ██║██╔══██║    ██║╚██╔╝██║██║   ██║██║  ██║██╔══╝  ██╔══██╗██║╚██╗██║██╔══╝     ║
-║   ╚██████╔╝██║ ╚═╝ ██║███████╗╚██████╔╝██║  ██║    ██║ ╚═╝ ██║╚██████╔╝██████╔╝███████╗██║  ██║██║ ╚████║███████╗   ║
-║    ╚═════╝ ╚═╝     ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝    ╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝   ║
-║                                                                                                                     ║
-║                                     ██████╗██╗     ██╗███████╗███╗   ██╗████████╗                                   ║
-║                                    ██╔════╝██║     ██║██╔════╝████╗  ██║╚══██╔══╝                                   ║
-║                                    ██║     ██║     ██║█████╗  ██╔██╗ ██║   ██║                                      ║
-║                                    ██║     ██║     ██║██╔══╝  ██║╚██╗██║   ██║                                      ║
-║                                    ╚██████╗███████╗██║███████╗██║ ╚████║   ██║                                      ║
-║                                     ╚═════╝╚══════╝╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝                                      ║
-╚═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
-"""
 console = Console()
+# Credit: https://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Omega%20Moderne%0A%20%20%20%20%20%20%20Client
+header: str
+if console.width < 80:
+    header = headers.HEADER_NARROW
+else:
+    header = headers.HEADER_NORMAL
 layout = Layout()
 layout.split(
     Layout(name='header', size=17),
