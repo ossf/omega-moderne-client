@@ -7,7 +7,7 @@ on:
 
 jobs:
   pick-campaign:
-    depends-on: [test]
+    needs: [CI]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -35,7 +35,6 @@ jobs:
 
   run-campaign-scheduled:
     needs: [pick-campaign]
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/recurring-campaign-base.yml
     with:
       campaign_identifier: ${{ needs.pick-campaign.outputs.campaign-name }}
