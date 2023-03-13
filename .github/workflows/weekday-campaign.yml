@@ -37,3 +37,4 @@ jobs:
     uses: ./.github/workflows/recurring-campaign-base.yml
     with:
       campaign_identifier: ${{ needs.pick-campaign.outputs.campaign-name }}
+    secrets: inherit
