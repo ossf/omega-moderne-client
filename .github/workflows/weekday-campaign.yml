@@ -22,7 +22,7 @@ jobs:
           pip install .[github-scripts]
       - name: Pick campaign to execute
         run: |
-          export CAMPAIGN_NAME = $(/.github/scripts/pick-campaign-to-run.py)
+          export CAMPAIGN_NAME=$(/.github/scripts/pick-campaign-to-run.py)
           if [ $? -ne 0 ]; then
             echo "No campaign to run"
             exit 0
