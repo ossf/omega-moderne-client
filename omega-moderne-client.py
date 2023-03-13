@@ -16,12 +16,15 @@ from rich.live import Live
 from rich.markup import escape
 from rich.table import Table
 from rich.text import Text
+from rich.tree import Tree
 from rich_argparse import RichHelpFormatter
 
 from omega_moderne_client.campaign.campaign import Campaign
 from omega_moderne_client.campaign.campaign_executor import CampaignExecutor, PrintingCampaignExecutorProgressMonitor
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
-from omega_moderne_client.client.moderne_client import ModerneClient, Repository, RecipeRunSummary
+from omega_moderne_client.client.moderne_client import ModerneClient
+from omega_moderne_client.client.client_types import RecipeRunSummary, Repository
+from omega_moderne_client.repository_filter import Filter, FilterDetailedReason, FilterReason
 from omega_moderne_client.util import verbose_timedelta, headers
 
 console = Console()
@@ -74,24 +77,25 @@ class ConsolePrintingCampaignExecutorProgressMonitor(PrintingCampaignExecutorPro
         table.add_column('Recipe Run', justify='right')
 
         for summary in repository_run_summaries:
-            if summary['totalChanged'] == 0 and summary['state'] == 'FINISHED':
+            if summary.totalChanged == 0 and summary.state == 'FINISHED':
                 continue
-            repository: Repository = summary['repository']
-            organization = repository['path'].split('/')[0]
-            repository_name = repository['path'].split('/')[1]
+            repository: Repository = summary.repository
+            organization = repository.path.split('/')[0]
+            repository_name = repository.path.split('/')[1]
             repository_name_cell = repository_name
-            if summary['totalChanged'] != 0:
-                base64_repository_json = base64.b64encode(json.dumps(repository).encode('utf-8')).decode('utf-8')
+            if summary.totalChanged != 0:
+                base64_repository_json = \
+                    base64.b64encode(json.dumps(repository._asdict()).encode('utf-8')).decode('utf-8')
                 link = f"https://{self.domain}/results/{run_id}/details/{base64_repository_json}"
                 repository_name_cell = f"[blue][link={link}]{repository_name}[/link]"
             table.add_row(
-                self._color_state(summary['state']),
+                self._color_state(summary.state),
                 organization,
                 repository_name_cell,
-                repository['branch'],
-                str(summary['totalChanged']),
-                str(summary['totalSearched']),
-                verbose_timedelta(parse_duration(summary['performance']['recipeRun']))
+                repository.branch,
+                str(summary.totalChanged),
+                str(summary.totalSearched),
+                verbose_timedelta(parse_duration(summary.performance.recipeRun))
             )
         return table
 
@@ -215,6 +219,21 @@ def main():
             sys.exit(130)
 
 
+def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[FilterDetailedReason]]):
+    if not filtered_repositories:
+        return
+    root = Tree("Filtered repositories", style="bold red")
+    reverse_reason_map: Dict[FilterReason, Tree] = {}
+    for repository, reasons in filtered_repositories.items():
+        # console.print(f"Repository {repository} was filtered out because:")
+        for reason in reasons:
+            # console.print(f"  - {reason.reason}: {reason.details}")
+            if reason.reason not in reverse_reason_map:
+                reverse_reason_map[reason.reason] = root.add(reason.reason.name, style="bold red")
+            reverse_reason_map[reason.reason].add(f"{repository} ({reason.details})")
+    console.print(root)
+
+
 def run_recipe_maybe_generate_prs(args):
     if args.generate_prs:
         console.print("Generate prs enabled. Pull requests will be created!")
@@ -232,6 +251,10 @@ def run_recipe_maybe_generate_prs(args):
     )
     recipe_execution_result = executor.await_recipe(run_id=run_id)
 
+    repository_filter = Filter.create_all()
+    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
+    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+
     if not args.generate_prs:
         console.print("Generate prs not enabled. Complete!")
         sys.exit(0)
@@ -241,7 +264,7 @@ def run_recipe_maybe_generate_prs(args):
     commit_id = executor.launch_pull_request(
         campaign,
         gpg_key_config,
-        recipe_execution_result
+        filtered_recipe_execution_result
     )
     executor.await_pull_request(commit_id=commit_id)
 
@@ -250,7 +273,11 @@ def recipe_attach(args):
     client = ModerneClient.load_from_env(args.moderne_domain)
     console.print(f"View live on Moderne https://{client.domain}/results/{args.run_id}")
     executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
-    executor.await_recipe(args.run_id)
+    recipe_execution_result = executor.await_recipe(args.run_id)
+    # Display the filtered repositories
+    repository_filter = Filter.create_all()
+    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
+    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
 
 
 def pr_attach(args):

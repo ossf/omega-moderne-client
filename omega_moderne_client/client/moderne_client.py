@@ -1,23 +1,42 @@
 import abc
+import asyncio
 import base64
 import os
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Any, Dict, Optional, TypedDict
+from typing import List, Any, Dict, Optional, TypeVar, Generic, cast, Union
 
 from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
 # noinspection PyPackageRequirements
-from graphql import DocumentNode
+from graphql import DocumentNode, ExecutionResult, GraphQLSchema
 
 from omega_moderne_client.campaign.campaign import Campaign
+from omega_moderne_client.client.client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
+
+__all__ = ["ModerneClient"]
+
+
+class ClientWrapper(abc.ABC):
+    @abc.abstractmethod
+    def execute(
+            self,
+            document: DocumentNode,
+            variable_values: Optional[Dict[str, Any]] = None,
+    ) -> Union[Dict[str, Any], ExecutionResult]:
+        pass
+
+    @abc.abstractmethod
+    def get_schema(self) -> GraphQLSchema:
+        pass
 
 
 @dataclass(frozen=True)
 class ModerneClient:
     domain: str
-    _client: Client
+    _client: ClientWrapper
 
     @staticmethod
     def load_from_env(domain: str = "public.moderne.io") -> "ModerneClient":
@@ -25,31 +44,57 @@ class ModerneClient:
         api_token: str
         if token_file.exists():
             with open(token_file, 'r', encoding='utf-8') as file:
-                api_token = file.read().strip()
-            if not api_token:
+                read_token = file.read().strip()
+            if not read_token:
                 raise ValueError(f"Token file {token_file} is empty")
+            api_token = read_token
         else:
-            api_token = os.getenv("MODERNE_API_TOKEN")
-            if not api_token:
+            read_token = os.getenv("MODERNE_API_TOKEN")
+            if not read_token:
                 raise ValueError(
                     "No token file found at `~/.moderne/token.txt` and " +
                     "`MODERNE_API_TOKEN` environment variable is not set!"
                 )
+            api_token = read_token
         return ModerneClient.create(api_token, domain=domain)
 
     @staticmethod
     def create(moderne_api_token: str, domain: str = "public.moderne.io") -> "ModerneClient":
+        client = Client(
+            transport=AIOHTTPTransport(
+                url=f"https://api.{domain}/",
+                headers={
+                    "Authorization": f'Bearer {moderne_api_token}'
+                },
+                timeout=60,
+            ),
+            fetch_schema_from_transport=True,
+            parse_results=True
+        )
+
+        class ModerneClientWrapper(ClientWrapper):
+            def execute(
+                    self,
+                    document: DocumentNode,
+                    variable_values: Optional[Dict[str, Any]] = None,
+            ) -> Union[Dict[str, Any], ExecutionResult]:
+                start = time.time()
+                try:
+                    return client.execute(document, variable_values=variable_values)
+                except asyncio.exceptions.TimeoutError as error:
+                    end = time.time()
+                    raise TimeoutError(
+                        f"The Moderne API timed out after {end - start} seconds. Please try again later."
+                    ) from error
+
+            def get_schema(self) -> GraphQLSchema:
+                # Run a query to force the schema to get loaded
+                self.execute(gql("{ __schema { types { name } } }"))
+                return client.schema
+
         return ModerneClient(
             domain=domain,
-            _client=Client(
-                transport=AIOHTTPTransport(
-                    url=f"https://api.{domain}/",
-                    headers={
-                        "Authorization": f'Bearer {moderne_api_token}'
-                    }
-                ),
-                fetch_schema_from_transport=True,
-            )
+            _client=ModerneClientWrapper()
         )
 
     def run_campaign(self, campaign: Campaign, target_organization_id: str = "Default", priority: str = "LOW") -> str:
@@ -114,14 +159,14 @@ class ModerneClient:
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None
     ) -> List['RecipeRunSummary']:
-        return GetRecipeRunSummaryResults(client=self._client).get_all(recipe_run_id, filter_by=filter_by)
+        return GetRecipeRunSummaryResults(self._client).get_all(recipe_run_id, filter_by=filter_by)
 
     def query_recipe_run_sorted_by_results(self, recipe_run_id: str) -> List['RecipeRunSummary']:
-        return GetRecipeRunSummaryResults(client=self._client).get_all(
+        return GetRecipeRunSummaryResults(self._client).get_all(
             recipe_run_id,
             filter_by={'statuses': ['FINISHED'], 'onlyWithResults': True},
             order_by={'direction': 'DESC', 'field': 'TOTAL_RESULTS'}
-        ) + GetRecipeRunSummaryResults(client=self._client).get_first_page(
+        ) + GetRecipeRunSummaryResults(self._client).get_first_page(
             recipe_run_id,
             filter_by={'statuses': ['ERROR', 'LOADING', 'QUEUED', 'RUNNING', 'CREATED', 'UNAVAILABLE']},
         )
@@ -131,9 +176,9 @@ class ModerneClient:
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None
     ) -> List['Repository']:
-        return [summary['repository'] for summary in self.query_recipe_run(recipe_run_id, filter_by)]
+        return [summary.repository for summary in self.query_recipe_run(recipe_run_id, filter_by)]
 
-    def query_recipe_run_results_repositories(self, recipe_run_id: str) -> List[Dict[str, Any]]:
+    def query_recipe_run_results_repositories(self, recipe_run_id: str) -> List['Repository']:
         return self.query_recipe_run_repositories(recipe_run_id, {'statuses': ['FINISHED'], 'onlyWithResults': True})
 
     def fork_and_pull_request(
@@ -141,7 +186,7 @@ class ModerneClient:
             recipe_id: str,
             campaign: Campaign,
             gpg_key_config: GpgKeyConfig,
-            repositories: List[Dict[str, str]]
+            repositories: List[Repository]
     ) -> str:
         fork_and_pull_request_query = gql(
             # language=GraphQL
@@ -188,8 +233,8 @@ class ModerneClient:
         result = self._client.execute(fork_and_pull_request_query, variable_values=params)
         return result["forkAndPullRequest"]["id"]
 
-    def query_commit_job_commits(self, commit_job_id: str) -> List[Dict[str, Any]]:
-        return GetCommitJobCommits(client=self._client).call(commit_job_id)
+    def query_commit_job_commits(self, commit_job_id: str) -> List[Commit]:
+        return GetCommitJobCommits(self._client).call(commit_job_id)
 
     def query_commit_job_with_summary(self, commit_job_id: str) -> Dict[str, Any]:
         commit_job_summary_query = gql(
@@ -218,7 +263,7 @@ class ModerneClient:
         return result["commitJob"]
 
     def query_commit_job_status(self, commit_job_id: str) -> Dict[str, Any]:
-        results: List[Dict[str, Any]] = self.query_commit_job_commits(commit_job_id)
+        results: List[Commit] = self.query_commit_job_commits(commit_job_id)
         commit_job = self.query_commit_job_with_summary(commit_job_id)
         summary_results = commit_job["summaryResults"]
         state: str
@@ -226,7 +271,7 @@ class ModerneClient:
             # Not currently supported, but hopefully will be in the future.
             # https://linuxfoundation.slack.com/archives/C04HR6EJ38D/p1678137720981939
             state = commit_job["state"]
-        elif "CANCELED" in (node["state"] for node in results):
+        elif "CANCELED" in (node.state for node in results):
             # TODO: This is a hack, we should be able to get the state from the commit job
             state = "CANCELED"
         elif summary_results["count"] == commit_job["completed"]:
@@ -241,17 +286,28 @@ class ModerneClient:
         commit_job["state"] = state
         return commit_job
 
+    def schema(self) -> str:
+        # noinspection PyPackageRequirements
+        from graphql import print_schema  # pylint: disable=import-outside-toplevel
+        return print_schema(self._client.get_schema())
+
+
+T = TypeVar('T')
+
 
 @dataclass(frozen=True)
-class PagedQuery(abc.ABC):
-    client: Client
+class PagedQuery(abc.ABC, Generic[T]):
+    client: ClientWrapper
     query: DocumentNode
 
     @abc.abstractmethod
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         pass
 
-    def request_page(self, after: str, **kwargs) -> dict:
+    def map_node(self, node: Dict[str, Any]) -> T:
+        return cast(T, node)
+
+    def request_page(self, after: Optional[str], **kwargs) -> dict:
         """
         Execute a paged query. Return the page of results.
         """
@@ -259,30 +315,30 @@ class PagedQuery(abc.ABC):
         params.update(kwargs)
         return self.client.execute(self.query, variable_values=params)
 
-    def request_all(self, **kwargs) -> List[Dict[str, Any]]:
+    def request_all(self, **kwargs) -> List[T]:
         """
         Take a paged query and return all results.
         """
         next_after = None
-        results: List[Dict[str, Any]] = []
+        results: List[T] = []
         while True:
             paged = self.map_page(self.request_page(next_after, **kwargs))
-            results.extend([edge["node"] for edge in paged["edges"]])
+            results.extend([self.map_node(edge["node"]) for edge in paged["edges"]])
             if not paged["pageInfo"]["hasNextPage"]:
                 break
             next_after = paged["pageInfo"]["endCursor"]
         return results
 
-    def get_page_results(self, after: str, **kwargs) -> List[Any]:
+    def get_page_results(self, after: Optional[str], **kwargs) -> List[T]:
         """
         Execute a paged query. Return the page of results.
         """
         paged = self.map_page(self.request_page(after, **kwargs))
-        return [edge["node"] for edge in paged["edges"]]
+        return [self.map_node(edge["node"]) for edge in paged["edges"]]
 
 
 @dataclass(frozen=True)
-class GetRecipeRunSummaryResults(PagedQuery):
+class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
     query: DocumentNode = field(default=gql(
         # language=GraphQL
         """
@@ -329,61 +385,46 @@ class GetRecipeRunSummaryResults(PagedQuery):
         """
     ))
 
+    def map_node(self, node: Dict[str, Any]) -> RecipeRunSummary:
+        node = node.copy()
+        node["performance"] = RecipeRunPerformance(**node["performance"])
+        node["repository"] = Repository(**node["repository"])
+        return RecipeRunSummary(**node)
+
     def get_first_page(
             self,
             recipe_run_id: str,
-            filter_by: Dict[str, Any] = None,
-            order_by: Dict[str, Any] = None,
-    ) -> List['RecipeRunSummary']:
+            filter_by: Optional[Dict[str, Any]] = None,
+            order_by: Optional[Dict[str, Any]] = None,
+    ) -> List[RecipeRunSummary]:
         args = {"id": recipe_run_id}
         if filter_by:
             args["filterBy"] = filter_by
         if order_by:
             args["orderBy"] = order_by
-        return self.get_page_results(None, **args)
+        # https://github.com/google/pytype/issues/1395
+        return self.get_page_results(None, **args)  # pytype: disable=bad-return-type
 
     def get_all(
             self,
             recipe_run_id: str,
-            filter_by: Dict[str, Any] = None,
-            order_by: Dict[str, Any] = None,
-    ) -> List['RecipeRunSummary']:
+            filter_by: Optional[Dict[str, Any]] = None,
+            order_by: Optional[Dict[str, Any]] = None,
+    ) -> List[RecipeRunSummary]:
         args = {"id": recipe_run_id}
         if filter_by:
             args["filterBy"] = filter_by
         if order_by:
             args["orderBy"] = order_by
-        return self.request_all(**args)
+        # https://github.com/google/pytype/issues/1395
+        return self.request_all(**args)  # pytype: disable=bad-return-type
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["recipeRun"]["summaryResultsPages"]
 
 
-class RecipeRunSummary(TypedDict):
-    debugMarkers: int
-    errorMarkers: int
-    infoMarkers: int
-    warningMarkers: int
-    timeSavings: str
-    totalChanged: int
-    totalSearched: int
-    state: str
-    performance: 'RecipeRunPerformance'
-    repository: 'Repository'
-
-
-class RecipeRunPerformance(TypedDict):
-    recipeRun: str
-
-
-class Repository(TypedDict):
-    origin: str
-    path: str
-    branch: str
-
-
 @dataclass(frozen=True)
-class GetCommitJobCommits(PagedQuery):
+class GetCommitJobCommits(PagedQuery[Commit]):
     query: DocumentNode = field(default=gql(
         # language=GraphQL
         """
@@ -406,7 +447,6 @@ class GetCommitJobCommits(PagedQuery):
                                 origin
                                 path
                                 branch
-                                weight
                             }
                             resultLink
                             state
@@ -425,8 +465,18 @@ class GetCommitJobCommits(PagedQuery):
         """
     ))
 
-    def call(self, commit_job_id: str) -> List[Dict[str, Any]]:
-        return self.request_all(**{"id": commit_job_id})
+    def map_node(self, node: Dict[str, Any]) -> Commit:
+        node = node.copy()
+        node["repository"] = Repository(**node["repository"])
+        return Commit(**node)
+
+    def call(self, commit_job_id: str) -> List[Commit]:
+        # https://github.com/google/pytype/issues/1395
+        return self.request_all(**{"id": commit_job_id})  # pytype: disable=bad-return-type
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["commitJob"]["commits"]
+
+
+if __name__ == "__main__":
+    print(ModerneClient.load_from_env().schema())
