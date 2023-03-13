@@ -55,4 +55,4 @@ jobs:
           pip install .[cli]
       - name: Run campaign
         run: |
-          ./omega-moderne-client.py run-recipe ${{ inputs.campaign_identifier }} --moderne-organization Default
+          ./omega-moderne-client.py run-recipe ${{ inputs.campaign_identifier }} --moderne-organization ALL
