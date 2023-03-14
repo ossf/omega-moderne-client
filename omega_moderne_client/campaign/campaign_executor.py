@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import Any, List, Dict
 
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
-from omega_moderne_client.client.moderne_client import ModerneClient, RecipeRunSummary
+from omega_moderne_client.client.moderne_client import ModerneClient
+from ..client.client_types import RecipeRunSummary, Repository
 from .campaign import Campaign
 
 
@@ -68,7 +69,7 @@ class CampaignExecutor:
 @dataclass(frozen=True)
 class RecipeExecutionResult:
     run_id: str
-    repositories: List[Any]
+    repositories: List[Repository]
 
 
 class CampaignExecutorProgressMonitor(abc.ABC):
