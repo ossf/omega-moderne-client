@@ -108,7 +108,6 @@ class ModerneClient:
         run_fix_query = gql(
             # language=GraphQL
             """
-            # noinspection GraphQLUnresolvedReference
             mutation runSecurityFix($organizationId: ID, $yaml: Base64!, $priority: RecipeRunPriority) {
               runYamlRecipe(organizationId: $organizationId, yaml: $yaml, priority: $priority) {
                 id
@@ -131,7 +130,6 @@ class ModerneClient:
         recipe_run_results = gql(
             # language=GraphQL
             """
-            # noinspection GraphQLUnresolvedReference
             query getRecipeRun($id: ID!) {
                 recipeRun(id: $id) {
                     id
@@ -191,7 +189,6 @@ class ModerneClient:
         fork_and_pull_request_query = gql(
             # language=GraphQL
             """
-            # noinspection GraphQLUnresolvedReference
             mutation forkAndPullRequest(
               $commit: CommitInput!,
               $organization: String!,
@@ -240,7 +237,6 @@ class ModerneClient:
         commit_job_summary_query = gql(
             # language=GraphQL
             """
-            # noinspection GraphQLUnresolvedReference
             query getCommitJob($id: ID!) {
                 commitJob(id: $id) {
                     id
@@ -342,7 +338,6 @@ class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
     query: DocumentNode = field(default=gql(
         # language=GraphQL
         """
-        # noinspection GraphQLUnresolvedReference
         query getRecipeRun(
             $id: ID!,
             $after: String,
@@ -428,7 +423,6 @@ class GetCommitJobCommits(PagedQuery[Commit]):
     query: DocumentNode = field(default=gql(
         # language=GraphQL
         """
-        # noinspection GraphQLUnresolvedReference
         query getCommitJob($id: ID!, $after: String) {
             commitJob(id: $id) {
                 id
