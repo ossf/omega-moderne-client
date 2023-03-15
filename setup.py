@@ -19,7 +19,8 @@ if __name__ == "__main__":
         ],
         python_requires='>=3.6',
         install_requires=[
-          "gql[all]>=3.4.0"
+            "gql[all]>=3.4.0",
+            "requests>=2.28.2"
         ],
         extras_require={
             "cli": [
