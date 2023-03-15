@@ -1,0 +1,1646 @@
+# This file was generated based on ".graphqlconfig". Do not edit manually.
+
+schema {
+    query: Query
+    mutation: Mutation
+}
+
+interface CommitOptions {
+    branchName: String
+}
+
+interface Repository {
+    branch: String
+    origin: String
+    path: String!
+}
+
+"Interface for integrations that are configured through the Moderne Agent"
+interface ToolConfiguration {
+    "Agents that this tool is configured on"
+    agents(after: String, first: Int): AgentIndexConnection!
+    id: ID!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    "A valid URL, including scheme"
+    resourceId: String!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+union ScmConfiguration = BitbucketCloudConfiguration | BitbucketConfiguration | GitLabConfiguration | GithubConfiguration
+
+type AccessToken {
+    created: DateTime!
+    description: String
+    id: ID!
+}
+
+type Agent {
+    id: ID!
+    nickname: String
+    tools: [ToolConfiguration!]!
+    version: String!
+}
+
+type AgentIndexConnection {
+    count: Int
+    edges: [AgentIndexEdge]
+    pageInfo: PageInfo
+}
+
+type AgentIndexEdge {
+    cursor: String
+    node: Agent!
+}
+
+type ArtifactDiagnostics {
+    "All artifacts associated with a repository"
+    allArtifacts(repository: RepositoryInput!): [AstArtifactRepository]
+    "All artifacts associated with a location"
+    allArtifactsByLocation(
+        "Example: `moderne-ingest/moderneinc/cobol-sample-repo/`"
+        location: String!
+    ): [AstArtifactRepository]
+    "List of artifacts that have been described in the database, but have not had their artifacts downloaded to storage"
+    artifactsToDownload: [AstArtifactRepository]
+    "The newest artifact we've seen, regardless of whether or not it is downloaded"
+    indexableRepositories: [AstRepository!]!
+}
+
+type ArtifactStats {
+    "Total number of AST artifacts published on this date and subsequently uploaded to Moderne."
+    astsPublished: Int!
+    date: Date!
+}
+
+type ArtifactoryConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    "Statistics about the artifacts in this Artifactory instance"
+    artifactStats: [ArtifactStats!]!
+    "The query used to find artifacts in this Artifactory instance"
+    astQuery: String
+    " Shared fields"
+    id: ID!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    "A valid URL, including scheme"
+    resourceId: String!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type Ast {
+    artifactRepository: String!
+    location: String!
+    modified: DateTime!
+    weight: Long
+}
+
+type AstArtifactRepository {
+    artifactLocation: String
+    artifactModified: DateTime
+    artifactRepository: String
+    branch: String
+    buildId: String
+    buildPluginName: String
+    buildPluginVersion: String
+    changeset: String
+    origin: String
+    path: String
+}
+
+type AstIndexConnection {
+    count: Int
+    edges: [AstIndexEdge]
+    pageInfo: PageInfo
+}
+
+type AstIndexEdge {
+    cursor: String
+    node: Ast!
+}
+
+type AstRepository {
+    newestArtifactModifiedTime: DateTime
+    uri: String
+}
+
+type BitbucketCloudConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    " Shared fields"
+    id: ID!
+    isAuthorized: Boolean!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    "Only used for Bitbucket Cloud"
+    oauth: OAuthConfiguration
+    "A valid URL, including scheme"
+    resourceId: String!
+    "Active authorization tokens for Bitbucket Cloud"
+    tokens: [AccessToken!]!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type BitbucketCloudRepository implements Repository {
+    branch: String
+    changeset: String
+    """
+    Available on repositoryIndex and organizations queries
+    Example: `2021-05-13T11:56:29.818228-07:00`
+    """
+    ingested: DateTime
+    name: String!
+    origin: String
+    path: String!
+    project: String!
+    weight: Long
+}
+
+" Extend interface implementation types from Artifact Storage"
+type BitbucketConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    "Alternative URLS that can be used to access this Bitbucket instance"
+    alternateUrls: [String!]!
+    " Shared fields"
+    id: ID!
+    isAuthorized: Boolean!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    "A valid URL, including scheme"
+    resourceId: String!
+    ssh: SshConfiguration
+    "Active authorization tokens for Bitbucket"
+    tokens: [AccessToken!]!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type BitbucketRepository implements Repository {
+    branch: String
+    changeset: String
+    """
+    Available on repositoryIndex and organizations queries
+    Example: `2021-05-13T11:56:29.818228-07:00`
+    """
+    ingested: DateTime
+    name: String!
+    origin: String
+    path: String!
+    project: String!
+    weight: Long
+}
+
+type BranchCommitOptions implements CommitOptions {
+    branchName: String
+}
+
+type Column {
+    description: String!
+    displayName: String!
+    name: String!
+    type: String!
+}
+
+type Commit {
+    modified: DateTime!
+    repository: Repository!
+    resultLink: String
+    state: CommitState!
+    stateMessage: String
+}
+
+type CommitConnection {
+    count: Int
+    edges: [CommitEdge]
+    pageInfo: PageInfo
+}
+
+type CommitEdge {
+    cursor: String
+    node: Commit!
+}
+
+type CommitJob {
+    commits(after: String, filterBy: CommitJobFilterInput, first: Int = 50, orderBy: CommitJobOrderInput = {direction: DESC, field: MODIFIED}): CommitConnection!
+    completed: Int!
+    email: String!
+    excludedFiles: [String!]
+    extendedMessage: Base64
+    id: ID!
+    message: String!
+    options: CommitOptions!
+    recipeRunId: ID!
+    started: DateTime!
+    state: CommitJobState!
+    summaryResults: CommitJobSummary!
+}
+
+type CommitJobConnection {
+    count: Int
+    edges: [CommitJobEdge]
+    pageInfo: PageInfo
+}
+
+type CommitJobEdge {
+    cursor: String
+    node: CommitJob!
+}
+
+type CommitJobSummary {
+    canceledCount: Int!
+    count: Int!
+    failedCount: Int!
+    noChangeCount: Int!
+    successfulCount: Int!
+}
+
+type DataTable {
+    columns: [Column!]!
+    description: String!
+    displayName: String!
+    name: String!
+}
+
+type DataTableDownloadStats {
+    """
+    File size in bytes.
+    
+    When status is PENDING, this is the size of the file built to this point.
+    """
+    fileSize: Long!
+    "The number of repositories that contributed data to this table"
+    repositories: Int!
+}
+
+type DataTableDownloadTask {
+    dataTable: DataTable!
+    "URL will be `null` until the download job is complete."
+    downloadUrl: String
+    format: DataTableFormat!
+    "Download task ID provided by `downloadDataTable` mutation."
+    id: ID!
+    recipeRunId: String!
+    state: DownloadTaskState!
+    stateMessage: String
+    stats: DataTableDownloadStats!
+}
+
+type Event {
+    action: String!
+    actionType: ActionType!
+    description: Markdown!
+    outcome: String
+    target: String!
+    timestamp: DateTime!
+    userId: String!
+}
+
+type EventConnection {
+    count: Int!
+    edges: [EventEdge!]!
+    pageInfo: Page!
+}
+
+type EventEdge {
+    cursor: String!
+    node: Event!
+}
+
+type ForkCommitOptions implements CommitOptions {
+    branchName: String
+    """
+    If set, the fork will be created in this organization. Otherwise, the fork will be created in the user's
+    personal account.
+    """
+    organization: String
+    prefixOrganization: Boolean!
+}
+
+type ForkPullRequestOptions implements CommitOptions {
+    branchName: String
+    canRecreateClosedPullRequest: Boolean!
+    draft: Boolean!
+    "GitHub only flag to allow maintainers to edit a pull request."
+    maintainerCanModify: Boolean!
+    """
+    If set, the fork will be created in this organization. Otherwise, the fork will be created in the user's
+    personal account.
+    """
+    organization: String
+    prefixOrganization: Boolean!
+    pullRequestBody: Base64
+    "If unset, the commit message will be used as the pull request title."
+    pullRequestTitle: String
+}
+
+type GitHubRepository implements Repository {
+    branch: String
+    changeset: String
+    """
+    Available on repositoryIndex and organizations queries
+    Example: `2021-05-13T11:56:29.818228-07:00`
+    """
+    ingested: DateTime
+    name: String!
+    organization: String!
+    origin: String
+    path: String!
+    weight: Long
+}
+
+type GitLabConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    " Shared fields"
+    id: ID!
+    isAuthorized: Boolean!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    oauth: OAuthConfiguration
+    "A valid URL, including scheme"
+    resourceId: String!
+    ssh: SshConfiguration
+    "Active authorization tokens for GitLab"
+    tokens: [AccessToken!]!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type GitLabRepository implements Repository {
+    branch: String @deprecated(reason: "No longer supported")
+    changeset: String
+    """
+    Available on repositoryIndex and organizations queries
+    Example: `2021-05-13T11:56:29.818228-07:00`
+    """
+    ingested: DateTime
+    name: String!
+    organization: String! @deprecated(reason: "GitLab does not have a concept of an Organization, but rather groups and subgroups.")
+    origin: String
+    path: String!
+    """
+    GitLab's project structure is group/(subgroup/subgroup...)/repo.
+    
+    `projectNamespace` represents the concatenation of all groups (used to find the repo path)
+    """
+    projectNamespace: String!
+    weight: Long
+}
+
+type GithubConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    "A list of organizations that Moderne is permitted to fork repositories into"
+    allowableOrganizations: [String!]!
+    " Shared fields"
+    id: ID!
+    isAuthorized: Boolean!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    oauth: OAuthConfiguration
+    "A valid URL, including scheme"
+    resourceId: String!
+    ssh: SshConfiguration
+    "Active authorization tokens for GitHub"
+    tokens: [AccessToken!]!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type GroupArtifactVersion {
+    artifactId: String!
+    datedSnapshotVersion: String
+    groupId: String!
+    version: String!
+}
+
+type JenkinsConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    " Shared fields"
+    id: ID!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    "A valid URL, including scheme"
+    resourceId: String!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type Maintainer {
+    logo: String
+    name: String!
+}
+
+type MavenConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    " Maven-specific fields"
+    artifactStats: [ArtifactStats!]!
+    " Shared fields"
+    id: ID!
+    isArtifactSource: Boolean!
+    isRecipeSource: Boolean!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    localRepository: Path!
+    "Attempt to connect to this maven repository and share the results."
+    mavenResponseStatus: MavenResponseStatus!
+    "Does this repository support releases?"
+    releases: Boolean!
+    "A valid URL, including scheme"
+    resourceId: String!
+    "Does this repository support snapshots?"
+    snapshots: Boolean!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+type MavenResponseStatus {
+    "HTTP response code when calling this Maven repository."
+    responseCode: Int!
+    """
+    If this Maven configuration will be used for recipe loading and during recipe running
+    in worker.
+    """
+    supported: Boolean!
+    "If not supported by recipe loading/running, this field will contain the reason(s) why."
+    unsupportedReasons: [String!]
+}
+
+type Mutation {
+    """
+    Attempt to cancel all runs for all users.
+    The mutation will return immediately.
+    Cancellation is "best effort".
+    No guarantees are made of when or if the cancellations will complete.
+    """
+    cancelAllActiveRuns: Boolean
+    """
+    Attempt to cancel all runs for the user making the request.
+    The mutation will return immediately.
+    Cancellation is "best effort".
+    No guarantees are made of when or if the cancellations will complete.
+    """
+    cancelAllActiveRunsForUser: Boolean
+    cancelCommitJob(id: ID!): CommitJob!
+    """
+    Attempt to cancel the given run.
+    The mutation will return immediately.
+    Cancellation is "best effort".
+    No guarantees are made about when or if the cancellation will complete.
+    """
+    cancelRecipeRun(id: ID!): ID!
+    "Push a branch to the origin remote."
+    commit(commit: CommitInput): CommitJob!
+    createAccessToken(description: String): String!
+    "Requires administrative access"
+    deleteAllAccessTokens(email: String!): Boolean!
+    """
+    Removes all artifacts from the database that have been modified before the specified date.
+    
+    Requires administrative role.
+    """
+    deleteAstsOlderThan(modifiedTimestamp: DateTime!): Int
+    deleteRecipeArtifact(artifactId: String!, groupId: String!): Boolean
+    "Removes a Repository and all associated artifacts from the database."
+    deleteRepository(repositoryInput: RepositoryInput!): Boolean
+    """
+    Removes a repository and all associated artifacts from the database by location
+    
+    Requires administrative role.
+    """
+    deleteRepositoryByLocation(
+        "Example: `moderne-public/cobol-sample-repo/`"
+        location: String!
+    ): Boolean
+    "Initiate a download task (requires polling `dataTableDownload` query to check for completion)"
+    downloadDataTable(
+        dataTable: String!
+        "Supports CSV & EXCEL"
+        format: DataTableFormat! = CSV
+        recipeRunId: ID!
+    ): DataTableDownloadTask!
+    """
+    Bitbucket Server OAuth 1.0a - Exchange request token and verifier for Access Token. Successfully exchanged access
+    tokens are stored for future use.
+    """
+    exchangeBitbucketAuthorizationVerifier(origin: String, requestToken: String!, verifier: String!): Boolean!
+    """
+    Bitbucket Cloud OAuth 2.0 - Exchange authorization code for Access Token. Successfully exchanged access
+    tokens are stored for future use.
+    """
+    exchangeBitbucketCloudAuthorizationCode(
+        "Temporary code returned from SCM from Step 1 of the OAuth web application flow."
+        code: String!
+        "Origin e.g. bitbucket.org"
+        origin: String!
+        "Valid redirect URI for the associated SCM OAuth app."
+        redirectUri: String!
+    ): Boolean!
+    """
+    Exchanges a GitLab OAuth Auth code with PKCE access code for an access token.
+    Successfully exchanged tokens are stored for future use.
+    @see https://docs.gitlab.com/ee/api/oauth2.html#authorization-code-with-proof-key-for-code-exchange-pkce
+    """
+    exchangeGitLabAuthorizationCode(
+        "Authorization code returned from GitLab via oauth/authorize endpoint, step 1 in auth-code-pkce exchange"
+        code: String!
+        "PKCE code verifier used to generate code challenge sent to oauth/authorize endpoint"
+        codeVerifier: String!
+        "Origin e.g. gitlab.com"
+        origin: String!
+        "Valid redirect URI for the associated SCM OAuth app."
+        redirectUri: String!
+    ): Boolean!
+    """
+    Exchanges a Github OAuth access code for an access token.
+    
+    Successfully exchanged tokens are stored for future use.
+    
+    @see https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow
+    """
+    exchangeGithubAuthorizationCode(
+        "Temporary code returned from SCM from Step 1 of the OAuth web application flow."
+        code: String!
+        "Origin e.g. github.com"
+        origin: String!
+        "Valid redirect URI for the associated SCM OAuth app."
+        redirectUri: String!
+    ): Boolean!
+    "Push a branch to a fork."
+    forkAndCommit(
+        commit: CommitInput
+        """
+        If set, the fork will be created in this organization. Otherwise, the fork will be created in the user's
+        personal account.
+        """
+        organization: String
+        """
+        Rename the fork to include the prefix of the origin repository to avoid name collisions.
+        
+        Notes:
+        - This will only work if the fork is successfully created in the first place. Existing collisions will return as an error
+        
+        Example:
+        `openrewrite/rewrite` -> `myuser/rewrite` -> `myuser/openrewrite__rewrite`
+        """
+        shouldPrefixOrganizationName: Boolean = false
+    ): CommitJob!
+    "Open a pull request from a branch pushed to a fork."
+    forkAndPullRequest(
+        "Allows to reuse closed/merged pull request. By default pull request will be reused."
+        canRecreateClosedPullRequest: Boolean = true
+        commit: CommitInput
+        "Defaults to false."
+        draft: Boolean = false
+        "GitHub only flag to allow maintainers to edit a pull request."
+        maintainerCanModify: Boolean = false
+        """
+        If set, the fork will be created in this organization. Otherwise, the fork will be created in the user's
+        personal account.
+        """
+        organization: String
+        pullRequestBody: Base64
+        "If unset, the commit message will be used as the pull request title."
+        pullRequestTitle: String
+        shouldPrefixOrganizationName: Boolean = false
+    ): CommitJob!
+    """
+    Obtain a Bitbucket Server OAuth 1.0a Unauthorized Request Token. Returns request token to use with bitbucket
+    authorize endpoint
+    """
+    getBitbucketRequestToken(
+        "URL to redirect to after user authorizes token"
+        callbackUrl: String!
+        "Origin"
+        origin: String!
+    ): String!
+    "Manually run an indexing operation."
+    index(
+        after: String
+        """
+        If `true`, performs list and describe operations on the artifact repository, but does not update that database or download any artifacts.
+        
+        If `false`, performs:
+        
+        1. list updates available since `modifiedSince` (`now()` if not specified)
+        2. if `force` is `false`, look for new artifacts
+        3. describe artifacts (modifies database)
+        
+        Download action will be performed on next scheduled interval
+        """
+        dryRun: Boolean = false
+        first: Int = 50
+        "Override metadata about an artifact in the database and re-download it from the source."
+        forceUpdate: Boolean = false
+        """
+        Regular expression to match all or part of the location
+        Location example: moderne-ingest/com/netflix/Nicobar/nicobar-groovy2/0.3.2-SNAPSHOT/nicobar-groovy2-0.3.2-20230306.135104-1-ast.jar
+        """
+        locationRegex: String
+        """
+        If set, list artifacts that were published after that date, regardless of whether they have already been indexed previously.
+        
+        Defaults: `now()`
+        """
+        modifiedSince: DateTime
+    ): AstIndexConnection!
+    loadRecipes(artifactId: String!, datedSnapshotVersion: String, groupId: String!, trace: Boolean = false, version: String!): RecipeArtifact @deprecated(reason: "use `loadRecipesAsync` instead")
+    loadRecipesAsync(artifactId: String!, datedSnapshotVersion: String, groupId: String!, trace: Boolean = false, version: String!): RecipeDeploymentResult!
+    "Open a pull request from a branch pushed to the origin remote."
+    pullRequest(
+        "Allows to reuse closed/merged pull request. Default to true."
+        canRecreateClosedPullRequest: Boolean = true
+        commit: CommitInput
+        "Defaults to false."
+        draft: Boolean = false
+        pullRequestBody: Base64
+        "If unset, the commit message will be used as the pull request title."
+        pullRequestTitle: String
+    ): CommitJob!
+    """
+    When a repository routinely errors or causes instability, it can be quarantined, making it
+    effectively invisible to the service until it is un-quarantined
+    """
+    quarantineRepository(repositoryInput: RepositoryInput!): Repository
+    rerunFailedCommitJob(gpgKeys: GpgInput, id: ID!, scmAccessTokens: [ScmAccessToken!]): ID!
+    revokeAccessToken(id: ID!): Boolean!
+    "Remove all your active SCM OAuth tokens from the platform."
+    revokeAllScmTokens: Boolean!
+    "Not exposed on the supergraph. Used by token-service"
+    revokeBitbucketAccessToken(accessToken: String!, origin: String!, patToken: String!): Boolean!
+    "Revoke a specific SCM OAuth token from the platform."
+    revokeScmToken(scmServerUrl: String!): Boolean!
+    runRecipe(run: RecipeRunInput!): RecipeRun!
+    runYamlRecipe(organizationId: ID, priority: RecipeRunPriority = NORMAL, repositoryFilter: [RepositoryInput!], yaml: Base64!): RecipeRun!
+    unquarantineRepository(repositoryInput: RepositoryInput!): Repository
+}
+
+type OAuthConfiguration {
+    "The OAuth client ID to use when connecting to this tool."
+    clientId: String!
+    "If `true`, Moderne may add additional OAuth scopes to the authorization request to allow for access to private repositories."
+    includePrivateRepos: Boolean!
+}
+
+type Option {
+    description: String!
+    displayName: String!
+    example: String
+    name: String!
+    required: Boolean!
+    type: String!
+    valid: [String]
+    value: Object
+}
+
+type Organization {
+    commitOptions: [CommitOption!]!
+    id: ID!
+    name: String!
+    repositories: [Repository!]!
+    repositoryCount: Int!
+}
+
+type OrganizationConfiguration implements ToolConfiguration {
+    "Instances of the Moderne Agent where this tool has been configured"
+    agents(after: String, first: Int): AgentIndexConnection!
+    " Shared fields"
+    id: ID!
+    "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
+    isSkipSsl: Boolean!
+    "A valid URL, including scheme"
+    resourceId: String!
+    "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
+    valid: Boolean!
+}
+
+"A repository which originates from a source control management tool for which there is no agent connected."
+type OrphanedRepository implements Repository {
+    branch: String
+    changeset: String
+    ingested: DateTime
+    origin: String
+    path: String!
+    weight: Long
+}
+
+type Page {
+    endCursor: String!
+    hasNextPage: Boolean!
+}
+
+" Pagination Type - Generic"
+type PageInfo {
+    endCursor: String
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String
+}
+
+type PullRequestOptions implements CommitOptions {
+    branchName: String
+    canRecreateClosedPullRequest: Boolean!
+    draft: Boolean!
+    pullRequestBody: Base64
+    "If unset, the commit message will be used as the pull request title."
+    pullRequestTitle: String
+}
+
+type PullRequestStatistics {
+    date: DateTime!
+    id: ID!
+    origin: String
+    type: PullRequestState!
+}
+
+type Query {
+    accessTokenEmails: [String!]!
+    accessTokens: [AccessToken!]!
+    "Get all currently active recipes by a user id (passed via header), sorted by most recent."
+    activeRecipeRuns(limit: Int, sortOrder: SortOrder = DESC): [RecipeRun!]!
+    "Paginated result of all Moderne Agents that are presently connected to the Moderne Platform"
+    agents: AgentIndexConnection!
+    "Get all currently active recipes for all users, sorted by most recent."
+    allActiveRecipeRuns(limit: Int, sortOrder: SortOrder = DESC): [RecipeRun]! @deprecated(reason: "Use allRecipeRuns instead.")
+    allCommitJobs(after: String, first: Int = 50): CommitJobConnection!
+    "Get all recipe runs sorted by most recent."
+    allRecipeRuns(after: String, before: String, filterBy: RecipeRunFilterInput, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): RecipeRunHistoryConnection!
+    "Set of diagnostic queries to better understand the state of artifacts in the platform"
+    artifactDiagnostics: ArtifactDiagnostics!
+    "Returns the categories with associated recipes or subcategories."
+    categories(categoryId: ID): [RecipeCategory!]!
+    commitJob(id: ID!): CommitJob
+    "Sorted in descending order of start time"
+    commitJobs(after: String, first: Int = 50): CommitJobConnection!
+    "Poll to see if a data table download task has completed."
+    dataTableDownload(id: ID!): DataTableDownloadTask!
+    """
+    A list of the distinct repository origins that have produced rows for a particular data table.
+    This can be used to ensure that valid VCS OAuth tokens are available for all origins prior to
+    downloading a data table. If a valid OAuth token is not available at the time the data table is
+    downloaded, authorization checks for that origin will fail and the row will not be included in
+    the result. Without being able to complete an authorization check, we cannot determine if the user
+    has read access to that repository.
+    """
+    dataTableRepositoryOrigins(dataTable: String!, recipeRunId: ID!): [String!]!
+    events(after: String, filter: EventFilterInput, first: Int): EventConnection!
+    findRepositories(repositoryQuery: RepositoryInput!): [Repository!]!
+    findRepository(repositoryQuery: RepositoryInput!): Repository
+    """
+    Find a specific set of integrations by URL
+    
+    Requires administrative role.
+    """
+    httpTool(
+        "Example: `https://github.com`"
+        url: String!
+    ): [ToolConfiguration!]!
+    indexableRepositories: [AstRepository!]! @deprecated(reason: "Use artifactDiagnostics.indexableRepositories instead")
+    """
+    `groupId` and `artifactId` are glob-able patterns. When multiple deployments
+    exist for a particular group and artifact, return only the latest one (by start time).
+    May return an empty list if no such deployments are found. Deployment activity is not
+    persisted across service restarts, so this data is only available for a short time.
+    """
+    latestRecipeDeployments(artifactId: String!, groupId: String!): [RecipeDeploymentResult!]!
+    organization(
+        "Filter organizations by id"
+        id: ID!
+    ): Organization!
+    organizationExists(repository: RepositoryInput!): Boolean!
+    organizations(
+        "Filter organizations by id"
+        id: ID
+    ): [Organization!]!
+    "Get all recipe runs by a user id (passed via header) sorted by most recent."
+    previousRecipeRuns(after: String, before: String, filterBy: RecipeRunFilterInput, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): RecipeRunHistoryConnection!
+    pullRequestStatistics(origin: String!, query: String!): [PullRequestStatistics!]!
+    quarantinedRepositories: [Repository!]
+    """
+    Look up a single recipe record by it's fully-qualified `ID`. \n
+    Example: `id`: `org.openrewrite.java.testing.junit5.IgnoreToDisabled`
+    """
+    recipe(id: ID!): Recipe!
+    "Return all loaded recipe artifacts"
+    recipeArtifacts: [RecipeArtifact!]!
+    recipeDeployment(id: ID!): RecipeDeploymentResult!
+    recipeDeployments(state: RecipeDeploymentState): [RecipeDeploymentResult!]!
+    recipeRun(id: ID!): RecipeRun!
+    "Used to fetch meta information about a recipe result for a particular repository."
+    recipeRunSummaryByRepository(
+        "Recipe Run ID"
+        id: ID!
+        "Example: {\"scmType\":\"GITHUB\",\"origin\":\"git@...\",\"path\":\"Netflix/eureka\",\"branch\":\"main\"}"
+        repositoryInput: RepositoryInput!
+    ): RecipeRunSummary!
+    "Returns the list of known repository identifiers"
+    repositoryIndex(showOrphaned: Boolean = false): [Repository!]
+    scm(resourceId: String!): ScmConfiguration
+    scms: [ScmConfiguration!]!
+    "Search for recipes matching the supplied search query."
+    searchRecipes(after: String, first: Int = 50, query: String!, sortBy: RecipeSortKey = DEFAULT, sortOrder: SortOrder = DESC): RecipeSearchConnection!
+    "Return statistics about the number of recipes and the number of repositories"
+    statistics: ServiceStatistics!
+    """
+    List of all integrations that are configured through connected Moderne Agent(s)
+    
+    Requires administrative role.
+    """
+    tools: [ToolConfiguration!]!
+    "Does the current user have access to the repository specified by origin?"
+    userHasAccessToRepository(repository: RepositoryInput!): Boolean!
+    worker(name: String!): Worker
+    "This query returns a list of all active worker nodes processing recipes."
+    workers: [Worker!]!
+}
+
+type Recipe {
+    dataTables: [DataTable!]!
+    description: Markdown
+    "Example: `org.openrewrite.java.testing.junit5.IgnoreToDisabled`"
+    id: ID!
+    languages: [String!]!
+    maintainers: [Maintainer!]
+    name: Markdown!
+    options: [Option!]!
+    recipeArtifact: RecipeArtifact
+    recipeList: [Recipe!]!
+    """
+    URL to the source file \
+    Currently only OpenRewrite recipes have a source URL
+    """
+    sourceUrl: String
+    tags: [String!]!
+    timeSavings: Duration
+    totalRecipes: Int!
+}
+
+type RecipeArtifact {
+    artifactId: String!
+    datedSnapshotVersion: String
+    groupId: String!
+    repositoryUrl: String
+    requestedVersion: String!
+    """
+    The time from datedSnapshotVersion extracted into a DateTime
+    for human-readable presentation in time zones other than UTC
+    """
+    snapshotTime: DateTime
+    transitiveDependencyVersions: [GroupArtifactVersion!]!
+    version: String!
+}
+
+type RecipeCategory {
+    breadcrumbs: [RecipeCategoryBreadcrumb!]!
+    "Categories are sorted alphabetically by name."
+    categories: [RecipeCategory!]!
+    description: Markdown
+    id: ID!
+    name: Markdown!
+    "Any given category will have either recipes or sub-categories, but not both."
+    recipes: [Recipe!]!
+    tags: [String!]!
+    totalRecipeCount: Int!
+}
+
+type RecipeCategoryBreadcrumb {
+    id: ID!
+    name: String!
+}
+
+type RecipeDeploymentResult {
+    "Will be set if and only if `state` is `FINISHED`."
+    artifact: RecipeArtifact
+    duration: Duration
+    id: ID!
+    start: DateTime
+    state: RecipeDeploymentState!
+    stateMessage: String
+    "Trace information about how recipe artifact resolution proceeded."
+    trace: [String!]
+}
+
+type RecipeRun {
+    email: String
+    id: ID!
+    "The id of the organization the recipe was ran under."
+    organizationId: ID
+    recipe: Recipe!
+    repositoryFilter: [Repository!]!
+    start: DateTime!
+    state: RecipeRunState!
+    "Sorted alphabetically by Repository ID"
+    summaryResults: [RecipeRunSummary!]! @deprecated(reason: "Use summaryResultsPages instead.")
+    summaryResultsPages(after: String, before: String, filterBy: SummaryResultsFilterInput = {onlyWithResults: false}, first: Int = 100, last: Int, orderBy: SummaryResultsOrderInput = {direction: ASC, field: PATH}): RecipeRunSummaryConnection!
+    totals: RecipeRunTotals!
+    user: String!
+}
+
+type RecipeRunHistory {
+    recipe: Recipe! @deprecated(reason: "Use recipeRun instead.")
+    recipeRun: RecipeRun!
+    runId: ID!
+    start: DateTime!
+}
+
+" Pagination Types - Recipe Run History"
+type RecipeRunHistoryConnection {
+    count: Int
+    edges: [RecipeRunHistoryEdge]
+    pageInfo: PageInfo
+}
+
+type RecipeRunHistoryEdge {
+    cursor: String
+    node: RecipeRunHistory
+}
+
+type RecipeRunPerformance {
+    astLoading: Duration
+    recipeRun: Duration
+}
+
+type RecipeRunSummary {
+    commit: RepositoryProvenance
+    "Data tables produced by a recipe for this repository"
+    dataTables: [String!]!
+    "Total number of debug markers (not committable)."
+    debugMarkers: Int!
+    "Total number of error markers (not committable)."
+    errorMarkers: Int!
+    errorReason: RecipeRunSummaryErrorReason
+    "Total number of information markers (not committable)."
+    infoMarkers: Int!
+    lastUpdated: DateTime!
+    "The id of the organization the recipe was ran under."
+    organizationId: ID
+    performance: RecipeRunPerformance
+    repository: Repository!
+    runId: ID!
+    state: RecipeRunSummaryState!
+    stateMessage: String
+    "Estimated time savings if each occurrence of a recipe was applied."
+    timeSavings: Duration
+    "Total number of changes that would be visible in a patch or could be committed to the repository."
+    totalChanged: Int!
+    "Total number of markers in a file. Search markers are not visible in a patch or cannot be committed to the repository."
+    totalResults: Int!
+    totalSearched: Int!
+    "Total number of warning markers (not committable)."
+    warningMarkers: Int!
+}
+
+" Pagination Type - Recipe Run Summary"
+type RecipeRunSummaryConnection {
+    count: Int
+    edges: [RecipeRunSummaryEdge]
+    pageInfo: PageInfo
+}
+
+type RecipeRunSummaryEdge {
+    cursor: String
+    node: RecipeRunSummary
+}
+
+type RecipeRunTotals {
+    "Unique data table names produced by all repositories"
+    dataTables: [String!]!
+    "Total number of debug markers (not committable)."
+    totalDebugMarkers: Int!
+    "Total number of error markers (not committable)."
+    totalErrorMarkers: Int!
+    "Total number of changes that would be visible in a patch or could be committed to the repository."
+    totalFilesChanged: Int!
+    "Total number of files with markers"
+    totalFilesResults: Int!
+    "Total number of files searched across all repositories in the recipe run."
+    totalFilesSearched: Int!
+    "Total number of information markers (not committable)."
+    totalInfoMarkers: Int!
+    "Total number of repositories with markers."
+    totalRepositoriesSuccessful: Int!
+    "Total number of repositories with errors from the recipe run."
+    totalRepositoriesWithErrors: Int!
+    "Total number of repositories with no markers."
+    totalRepositoriesWithNoChanges: Int!
+    """
+    Total number of repositories with results.
+    
+    Results may or may not be visible in patches or committed to the repository.
+    """
+    totalRepositoriesWithResults: Int!
+    """
+    Total number of markers across all files.
+    
+    Markers are not changes that would be visible in a patch or could be committed to the repository.
+    """
+    totalResults: Int!
+    "Estimated time savings if each occurrence of a recipe was applied."
+    totalTimeSavings: Duration
+    "Total number of warning markers (not committable)."
+    totalWarningMarkers: Int!
+}
+
+" Pagination Types - Search Recipes"
+type RecipeSearchConnection {
+    count: Int
+    edges: [RecipeSearchEdge]
+    pageInfo: PageInfo
+}
+
+type RecipeSearchEdge {
+    cursor: String
+    node: Recipe
+}
+
+type RepositoryGroup {
+    description: String
+    name: String!
+    repositories: [Repository!]
+}
+
+type RepositoryProvenance {
+    branch: String
+    "Git SHA"
+    changeset: String
+}
+
+type ServiceStatistics {
+    recipeCount: Int!
+    repositoryCount: Int!
+}
+
+type SshConfiguration {
+    port: Int
+}
+
+type Worker {
+    connectedSince: DateTime!
+    name: String!
+    repositories: [Repository!]!
+}
+
+enum ActionType {
+    Create
+    Delete
+    Read
+    Update
+}
+
+enum CommitJobOrderField {
+    MODIFIED
+    REPOSITORY
+    STATE
+}
+
+enum CommitJobState {
+    """
+    Represents a commit job that was canceled.
+    
+    The commit job may have some commits that were successfully processed and some that were not.
+    """
+    CANCELED
+    "All commits failed."
+    FAILED
+    "Has commits either waiting to be processed or actively being processed."
+    IN_PROGRESS
+    """
+    None of the commits yielded changes.
+    
+    This is different from a successful commit job because no changes were made to the upstream repository.
+    """
+    NO_CHANGES
+    "All commits have finished processing and more than 50% were failures."
+    PARTIAL_FAILURE
+    "All commits have finished processing and 50% or more were successful."
+    PARTIAL_SUCCESS
+    """
+    All commits succeeded.
+    
+    This also includes commits that yielded no changes.
+    """
+    SUCCESSFUL
+}
+
+enum CommitOption {
+    Branch
+    Direct
+    Fork
+    ForkAndPullRequest
+    PullRequest
+}
+
+enum CommitState {
+    CANCELED
+    "A commit that was processed successfully."
+    COMPLETED
+    "A commit that was processed but encountered an error."
+    FAILED
+    """
+    A commit that was process but yielded no changes.
+    
+    Generally this occurs when applying a patch to the upstream repository does not produce any changes to the source file(s) to commit.
+    """
+    NO_CHANGES
+    """
+    A commit that was started but could not be completed in time.
+    A new processor should be able to pick up the commit and resume processing.
+    """
+    ORPHANED
+    "A commit that is actively being processed."
+    PROCESSING
+    "A commit that is waiting to be processed."
+    QUEUED
+}
+
+enum DataTableFormat {
+    CSV
+    EXCEL
+}
+
+enum DownloadTaskState {
+    FAILURE
+    PENDING
+    SUCCESS
+}
+
+enum ErrorDetail {
+    """
+    The deadline expired before the operation could complete.
+    
+    For operations that change the state of the system, this error
+    may be returned even if the operation has completed successfully.
+    For example, a successful response from a server could have been
+    delayed long enough for the deadline to expire.
+    
+    HTTP Mapping: 504 Gateway Timeout
+    Error Type: UNAVAILABLE
+    """
+    DEADLINE_EXCEEDED
+    """
+    The server detected that the client is exhibiting a behavior that
+    might be generating excessive load.
+    
+    HTTP Mapping: 429 Too Many Requests or 420 Enhance Your Calm
+    Error Type: UNAVAILABLE
+    """
+    ENHANCE_YOUR_CALM
+    """
+    The requested field is not found in the schema.
+    
+    This differs from `NOT_FOUND` in that `NOT_FOUND` should be used when a
+    query is valid, but is unable to return a result (if, for example, a
+    specific video id doesn't exist). `FIELD_NOT_FOUND` is intended to be
+    returned by the server to signify that the requested field is not known to exist.
+    This may be returned in lieu of failing the entire query.
+    See also `PERMISSION_DENIED` for cases where the
+    requested field is invalid only for the given user or class of users.
+    
+    HTTP Mapping: 404 Not Found
+    Error Type: BAD_REQUEST
+    """
+    FIELD_NOT_FOUND
+    """
+    The client specified an invalid argument.
+    
+    Note that this differs from `FAILED_PRECONDITION`.
+    `INVALID_ARGUMENT` indicates arguments that are problematic
+    regardless of the state of the system (e.g., a malformed file name).
+    
+    HTTP Mapping: 400 Bad Request
+    Error Type: BAD_REQUEST
+    """
+    INVALID_ARGUMENT
+    """
+    The provided cursor is not valid.
+    
+    The most common usage for this error is when a client is paginating
+    through a list that uses stateful cursors. In that case, the provided
+    cursor may be expired.
+    
+    HTTP Mapping: 404 Not Found
+    Error Type: NOT_FOUND
+    """
+    INVALID_CURSOR
+    """
+    Unable to perform operation because a required resource is missing.
+    
+    Example: Client is attempting to refresh a list, but the specified
+    list is expired. This requires an action by the client to get a new list.
+    
+    If the user is simply trying GET a resource that is not found,
+    use the NOT_FOUND error type. FAILED_PRECONDITION.MISSING_RESOURCE
+    is to be used particularly when the user is performing an operation
+    that requires a particular resource to exist.
+    
+    HTTP Mapping: 400 Bad Request or 500 Internal Server Error
+    Error Type: FAILED_PRECONDITION
+    """
+    MISSING_RESOURCE
+    """
+    Service Error.
+    
+    There is a problem with an upstream service.
+    
+    This may be returned if a gateway receives an unknown error from a service
+    or if a service is unreachable.
+    If a request times out which waiting on a response from a service,
+    `DEADLINE_EXCEEDED` may be returned instead.
+    If a service returns a more specific error Type, the specific error Type may
+    be returned instead.
+    
+    HTTP Mapping: 502 Bad Gateway
+    Error Type: UNAVAILABLE
+    """
+    SERVICE_ERROR
+    """
+    Request failed due to network errors.
+    
+    HTTP Mapping: 503 Unavailable
+    Error Type: UNAVAILABLE
+    """
+    TCP_FAILURE
+    """
+    Request throttled based on server concurrency limits.
+    
+    HTTP Mapping: 503 Unavailable
+    Error Type: UNAVAILABLE
+    """
+    THROTTLED_CONCURRENCY
+    """
+    Request throttled based on server CPU limits
+    
+    HTTP Mapping: 503 Unavailable.
+    Error Type: UNAVAILABLE
+    """
+    THROTTLED_CPU
+    """
+    The operation is not implemented or is not currently supported/enabled.
+    
+    HTTP Mapping: 501 Not Implemented
+    Error Type: BAD_REQUEST
+    """
+    UNIMPLEMENTED
+    """
+    Unknown error.
+    
+    This error should only be returned when no other error detail applies.
+    If a client sees an unknown errorDetail, it will be interpreted as UNKNOWN.
+    
+    HTTP Mapping: 500 Internal Server Error
+    """
+    UNKNOWN
+}
+
+enum ErrorType {
+    """
+    Bad Request.
+    
+    There is a problem with the request.
+    Retrying the same request is not likely to succeed.
+    An example would be a query or argument that cannot be deserialized.
+    
+    HTTP Mapping: 400 Bad Request
+    """
+    BAD_REQUEST
+    """
+    The operation was rejected because the system is not in a state
+    required for the operation's execution.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                For example, the directory
+    to be deleted is non-empty, an rmdir operation is applied to
+    a non-directory, etc.
+    
+    Service implementers can use the following guidelines to decide
+    between `FAILED_PRECONDITION` and `UNAVAILABLE`:
+    
+    - Use `UNAVAILABLE` if the client can retry just the failing call.
+    - Use `FAILED_PRECONDITION` if the client should not retry until
+    the system state has been explicitly fixed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                E.g., if an "rmdir"
+    fails because the directory is non-empty, `FAILED_PRECONDITION`
+    should be returned since the client should not retry unless
+    the files are deleted from the directory.
+    
+    HTTP Mapping: 400 Bad Request or 500 Internal Server Error
+    """
+    FAILED_PRECONDITION
+    """
+    Internal error.
+    
+    An unexpected internal error was encountered. This means that some
+    invariants expected by the underlying system have been broken.
+    This error code is reserved for serious errors.
+    
+    HTTP Mapping: 500 Internal Server Error
+    """
+    INTERNAL
+    """
+    The requested entity was not found.
+    
+    This could apply to a resource that has never existed (e.g. bad resource id),
+    or a resource that no longer exists (e.g. cache expired.)
+    
+    Note to server developers: if a request is denied for an entire class
+    of users, such as gradual feature rollout or undocumented allowlist,
+    `NOT_FOUND` may be used. If a request is denied for some users within
+    a class of users, such as user-based access control, `PERMISSION_DENIED`
+    must be used.
+    
+    HTTP Mapping: 404 Not Found
+    """
+    NOT_FOUND
+    """
+    The caller does not have permission to execute the specified
+    operation.
+    
+    `PERMISSION_DENIED` must not be used for rejections
+    caused by exhausting some resource or quota.
+    `PERMISSION_DENIED` must not be used if the caller
+    cannot be identified (use `UNAUTHENTICATED`
+    instead for those errors).
+    
+    This error Type does not imply the
+    request is valid or the requested entity exists or satisfies
+    other pre-conditions.
+    
+    HTTP Mapping: 403 Forbidden
+    """
+    PERMISSION_DENIED
+    """
+    The request does not have valid authentication credentials.
+    
+    This is intended to be returned only for routes that require
+    authentication.
+    
+    HTTP Mapping: 401 Unauthorized
+    """
+    UNAUTHENTICATED
+    """
+    Currently Unavailable.
+    
+    The service is currently unavailable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                This is most likely a
+    transient condition, which can be corrected by retrying with
+    a backoff.
+    
+    HTTP Mapping: 503 Unavailable
+    """
+    UNAVAILABLE
+    """
+    Unknown error.
+    
+    For example, this error may be returned when
+    an error code received from another address space belongs to
+    an error space that is not known in this address space.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Also
+    errors raised by APIs that do not return enough error information
+    may be converted to this error.
+    
+    If a client sees an unknown errorType, it will be interpreted as UNKNOWN.
+    Unknown errors MUST NOT trigger any special behavior. These MAY be treated
+    by an implementation as being equivalent to INTERNAL.
+    
+    When possible, a more specific error should be provided.
+    
+    HTTP Mapping: 520 Unknown Error
+    """
+    UNKNOWN
+}
+
+enum PullRequestState {
+    CLOSED
+    MERGED
+    OPEN
+}
+
+enum RecipeDeploymentState {
+    ERROR
+    FINISHED
+    LOADING
+    QUEUED
+}
+
+enum RecipeResultColumnKey {
+    AST_LOADING
+    BRANCH
+    DEBUG_MARKERS
+    ERROR_MARKERS
+    ERROR_REASON
+    INFO_MARKERS
+    LAST_UPDATED
+    PATH
+    RECIPE_RUN
+    STATUS
+    TOTAL_CHANGED
+    TOTAL_RESULTS
+    TOTAL_SEARCHED
+    WARNING_MARKERS
+}
+
+enum RecipeRunPriority {
+    LOW
+    NORMAL
+}
+
+enum RecipeRunState {
+    CANCELED
+    FINISHED
+    RUNNING
+}
+
+enum RecipeRunSummaryErrorReason {
+    FAILED_LOAD_AST
+    FAILED_LOAD_RECIPE
+    RECIPE_ERROR
+    TIMEOUT
+}
+
+enum RecipeRunSummaryState {
+    CANCELED
+    CREATED
+    "A worker was unable to process this recipe."
+    ERROR
+    FINISHED
+    "A repository's Abstract Syntax Tree is loading into a worker."
+    LOADING
+    "A repository is waiting for open workers to process the recipe."
+    QUEUED
+    RUNNING
+    "A worker was unavailable to display the results of this recipe."
+    UNAVAILABLE
+}
+
+enum RecipeSortKey {
+    DEFAULT
+    NAME
+    TOTAL_RECIPES
+}
+
+enum ScmType {
+    BITBUCKET
+    BITBUCKET_CLOUD
+    GITHUB
+    GITLAB
+}
+
+enum SortOrder {
+    ASC
+    DESC
+}
+
+"""
+`Base64` represents a base64 encoded string.
+In the browser, `btoa` encodes ASCII strings to Base64.
+"""
+scalar Base64
+
+scalar Date
+
+scalar DateTime
+
+"""
+String in ISO-8601.
+Example: `PT10S` -> 10 seconds
+"""
+scalar Duration
+
+scalar Long
+
+"Contents may contain Markdown, HTML, or other text and should be passed through a Markdown parser by consumers"
+scalar Markdown
+
+"An object scalar"
+scalar Object
+
+"""
+`Path` represents the path to a file or directory.
+The scalar value serializes and parses to a `string`.
+"""
+scalar Path
+
+input CommitInput {
+    "If unset, commit to the branch that the LST was generated from."
+    branchName: String
+    """
+    Email to author commit with. Verified against your emails (public and private) that are verified in your SCM provider.
+    If left blank, your first email will be used.
+    """
+    email: String
+    excludedFiles: [String!]
+    extendedMessage: Base64
+    gpgKey: GpgInput
+    message: String!
+    recipeRunId: ID!
+    repositories: [RepositoryInput!]!
+    """
+    Accepts personal access tokens created through your SCM Provider.
+    
+    This will be used in lieu of a OAuth token obtained through web flow.
+    
+    **Limitations:**
+    
+    - Bitbucket Data Center and Server requires version 5.5 or later.
+    - `scmAccessTokens` will take precedence over any access token stored in the database.
+    
+    @see https://docs.moderne.io/user-documentation/recipe-execution-and-commits-with-graphql#creating-a-pull-request
+    @see https://docs.moderne.io/references/create-scm-access-tokens
+    """
+    scmAccessTokens: [ScmAccessToken!]
+}
+
+input CommitJobFilterInput {
+    query: String
+    statuses: [CommitState!]
+}
+
+input CommitJobOrderInput {
+    direction: SortOrder!
+    field: CommitJobOrderField!
+}
+
+input EventFilterInput {
+    action: String
+    actionType: ActionType
+    outcome: String
+    target: String
+    userId: String
+}
+
+input GpgInput {
+    passphrase: String
+    privateKey: String!
+    publicKey: String!
+}
+
+input OptionInput {
+    "Example: `methodPattern`"
+    name: String!
+    "Example: `java.util.List add(..)`"
+    value: Object!
+}
+
+input PartialCommitInput {
+    branch: String!
+    "Git SHA"
+    changeset: String!
+    "SSH or HTTPS URL to the repository"
+    origin: String!
+}
+
+input PartialRepositoryInput {
+    commit: PartialCommitInput!
+    repositoryInput: RepositoryInput!
+    sourceFiles: [SourceFileInput!]!
+}
+
+input RecipeInput {
+    "Example: `org.openrewrite.java.search.FindMethods`"
+    id: ID!
+    options: [OptionInput!]
+}
+
+input RecipeRunFilterInput {
+    states: [RecipeRunState!]
+}
+
+input RecipeRunInput {
+    "When supplied the repositories the recipe will be run on will be sourced from the given organization."
+    organizationId: ID
+    partialRepository: PartialRepositoryInput
+    priority: RecipeRunPriority = NORMAL
+    recipe: RecipeInput!
+    repositoryFilter: [RepositoryInput!]
+}
+
+input RepositoryInput {
+    branch: String
+    origin: String
+    path: String!
+}
+
+input ScmAccessToken {
+    type: ScmType!
+    value: String!
+}
+
+input SourceFileInput {
+    source: Base64!
+    sourcePath: Path!
+}
+
+input SummaryResultsFilterInput {
+    errorReasons: [RecipeRunSummaryErrorReason]
+    "Only returns results that where changes would be made"
+    onlyWithResults: Boolean = false
+    "Fuzzy search repositories"
+    query: String
+    statuses: [RecipeRunSummaryState]
+}
+
+input SummaryResultsOrderInput {
+    direction: SortOrder!
+    field: RecipeResultColumnKey!
+}

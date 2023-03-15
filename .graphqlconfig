@@ -1,12 +1,12 @@
 {
-  "name": "Remote Schema",
-  "schemaPath": "remote-schema.graphql",
+  "name": "Moderne GraphQL API",
+  "schemaPath": "moderne-api-schema.graphql",
   "extensions": {
     "endpoints": {
       "Remote Moderne GraphQL Endpoint": {
         "url": "https://api.public.moderne.io/",
         "headers": {
-          "user-agent": "JS GraphQL"
+          "Authorization": "Bearer ${env:MODERNE_API_TOKEN}"
         },
         "introspect": true
       }
