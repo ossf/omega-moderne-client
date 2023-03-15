@@ -7,6 +7,7 @@ include .pylintrc
 include requirements.txt
 include tox.ini
 include .graphqlconfig
+include *.graphql
 include omega-moderne-client.py
 recursive-include omega_moderne_client *.md
 recursive-include omega_moderne_client *.txt
