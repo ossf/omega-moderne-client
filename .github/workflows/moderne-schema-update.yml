@@ -22,7 +22,7 @@ jobs:
       run: node moderne-api-schema-sync.js
       env:
         MODERNE_API_TOKEN: ${{ secrets.MODERNE_TOKEN }}
-    - name: Update `moderne-api-schema.graphql`
+    - name: Commit change to `moderne-api-schema.graphql`
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: Update `moderne-schema.graphql`
