@@ -5,9 +5,9 @@ from urllib.robotparser import RobotFileParser
 
 import requests
 
-from omega_moderne_client.client.client_types import Repository
-from omega_moderne_client.repository_filter import Filter
-from omega_moderne_client.repository_filter.filter_types import FilterDetailedReason, FilterReason
+from ..client.client_types import Repository
+from . import Filter
+from .filter_types import FilterDetailedReason, FilterReason
 
 
 @dataclass(frozen=True)

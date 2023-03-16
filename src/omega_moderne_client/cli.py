@@ -8,16 +8,21 @@ import sys
 from dataclasses import dataclass
 from typing import Dict, Any, List
 
-from isodate import parse_duration
-from rich.align import Align
-from rich.console import Console
-from rich.layout import Layout
-from rich.live import Live
-from rich.markup import escape
-from rich.table import Table
-from rich.text import Text
-from rich.tree import Tree
-from rich_argparse import RichHelpFormatter
+try:
+    from isodate import parse_duration
+    from rich.align import Align
+    from rich.console import Console
+    from rich.layout import Layout
+    from rich.live import Live
+    from rich.markup import escape
+    from rich.table import Table
+    from rich.text import Text
+    from rich.tree import Tree
+    from rich_argparse import RichHelpFormatter
+except ImportError as e:
+    sys.stderr.write('It seems omega-moderne-client is not installed with cli option. \n'
+                     'Run `pip install "omega-moderne-client[cli]"` to fix this.')
+    sys.exit(1)
 
 from omega_moderne_client.campaign.campaign import Campaign
 from omega_moderne_client.campaign.campaign_executor import CampaignExecutor, PrintingCampaignExecutorProgressMonitor
@@ -133,7 +138,74 @@ class ConsolePrintingCampaignExecutorProgressMonitor(PrintingCampaignExecutorPro
         console.log(*(escape(arg) for arg in args))
 
 
-def main():
+def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[FilterDetailedReason]]):
+    if not filtered_repositories:
+        return
+    root = Tree("Filtered repositories", style="bold red")
+    reverse_reason_map: Dict[FilterReason, Tree] = {}
+    for repository, reasons in filtered_repositories.items():
+        # console.print(f"Repository {repository} was filtered out because:")
+        for reason in reasons:
+            # console.print(f"  - {reason.reason}: {reason.details}")
+            if reason.reason not in reverse_reason_map:
+                reverse_reason_map[reason.reason] = root.add(reason.reason.name, style="bold red")
+            reverse_reason_map[reason.reason].add(f"{repository} ({reason.details})")
+    console.print(root)
+
+
+def run_recipe_maybe_generate_prs(args):
+    if args.generate_prs:
+        console.print("Generate prs enabled. Pull requests will be created!")
+    else:
+        console.print("Generate prs not enabled. No pull requests will be created!")
+
+    campaign = Campaign.load(args.campaign_id)
+    client = ModerneClient.load_from_env(args.moderne_domain)
+    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
+
+    console.print(f"Running campaign {campaign.name}...")
+    run_id = executor.launch_recipe(
+        campaign=campaign,
+        target_organization_id=args.moderne_organization
+    )
+    recipe_execution_result = executor.await_recipe(run_id=run_id)
+
+    repository_filter = Filter.create_all()
+    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
+    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+
+    if not args.generate_prs:
+        console.print("Generate prs not enabled. Complete!")
+        sys.exit(0)
+
+    gpg_key_config = GpgKeyConfig.load_from_env()
+    console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
+    commit_id = executor.launch_pull_request(
+        campaign,
+        gpg_key_config,
+        filtered_recipe_execution_result
+    )
+    executor.await_pull_request(commit_id=commit_id)
+
+
+def recipe_attach(args):
+    client = ModerneClient.load_from_env(args.moderne_domain)
+    console.print(f"View live on Moderne https://{client.domain}/results/{args.run_id}")
+    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
+    recipe_execution_result = executor.await_recipe(args.run_id)
+    # Display the filtered repositories
+    repository_filter = Filter.create_all()
+    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
+    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+
+
+def pr_attach(args):
+    client = ModerneClient.load_from_env(args.moderne_domain)
+    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
+    executor.await_pull_request(args.commit_id)
+
+
+def cli():
     console.print(header, justify="center")
     parser = argparse.ArgumentParser(
         description='Run a campaign to fix security vulnerabilities using Moderne.',
@@ -217,74 +289,3 @@ def main():
         except KeyboardInterrupt:
             console.print("Interrupted by user. Exiting...")
             sys.exit(130)
-
-
-def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[FilterDetailedReason]]):
-    if not filtered_repositories:
-        return
-    root = Tree("Filtered repositories", style="bold red")
-    reverse_reason_map: Dict[FilterReason, Tree] = {}
-    for repository, reasons in filtered_repositories.items():
-        # console.print(f"Repository {repository} was filtered out because:")
-        for reason in reasons:
-            # console.print(f"  - {reason.reason}: {reason.details}")
-            if reason.reason not in reverse_reason_map:
-                reverse_reason_map[reason.reason] = root.add(reason.reason.name, style="bold red")
-            reverse_reason_map[reason.reason].add(f"{repository} ({reason.details})")
-    console.print(root)
-
-
-def run_recipe_maybe_generate_prs(args):
-    if args.generate_prs:
-        console.print("Generate prs enabled. Pull requests will be created!")
-    else:
-        console.print("Generate prs not enabled. No pull requests will be created!")
-
-    campaign = Campaign.load(args.campaign_id)
-    client = ModerneClient.load_from_env(args.moderne_domain)
-    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
-
-    console.print(f"Running campaign {campaign.name}...")
-    run_id = executor.launch_recipe(
-        campaign=campaign,
-        target_organization_id=args.moderne_organization
-    )
-    recipe_execution_result = executor.await_recipe(run_id=run_id)
-
-    repository_filter = Filter.create_all()
-    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
-    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
-
-    if not args.generate_prs:
-        console.print("Generate prs not enabled. Complete!")
-        sys.exit(0)
-
-    gpg_key_config = GpgKeyConfig.load_from_env()
-    console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
-    commit_id = executor.launch_pull_request(
-        campaign,
-        gpg_key_config,
-        filtered_recipe_execution_result
-    )
-    executor.await_pull_request(commit_id=commit_id)
-
-
-def recipe_attach(args):
-    client = ModerneClient.load_from_env(args.moderne_domain)
-    console.print(f"View live on Moderne https://{client.domain}/results/{args.run_id}")
-    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
-    recipe_execution_result = executor.await_recipe(args.run_id)
-    # Display the filtered repositories
-    repository_filter = Filter.create_all()
-    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
-    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
-
-
-def pr_attach(args):
-    client = ModerneClient.load_from_env(args.moderne_domain)
-    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
-    executor.await_pull_request(args.commit_id)
-
-
-if __name__ == "__main__":
-    main()

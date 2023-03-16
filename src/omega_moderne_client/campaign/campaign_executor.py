@@ -3,8 +3,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, List, Dict
 
-from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
-from omega_moderne_client.client.moderne_client import ModerneClient
+from ..client.gpg_key_config import GpgKeyConfig
+from ..client.moderne_client import ModerneClient
 from ..client.client_types import RecipeRunSummary, Repository
 from .campaign import Campaign
 

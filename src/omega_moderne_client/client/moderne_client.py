@@ -12,9 +12,9 @@ from gql.transport.aiohttp import AIOHTTPTransport
 # noinspection PyPackageRequirements
 from graphql import DocumentNode, ExecutionResult, GraphQLSchema
 
-from omega_moderne_client.campaign.campaign import Campaign
-from omega_moderne_client.client.client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance
-from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
+from ..campaign.campaign import Campaign
+from .client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance
+from ..client.gpg_key_config import GpgKeyConfig
 
 __all__ = ["ModerneClient"]
 

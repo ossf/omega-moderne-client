@@ -8,9 +8,9 @@ include requirements.txt
 include tox.ini
 include .graphqlconfig
 include *.graphql
-include omega-moderne-client.py
-recursive-include omega_moderne_client *.md
-recursive-include omega_moderne_client *.txt
+recursive-include tests *.py
+recursive-include src/omega_moderne_client *.md
+recursive-include src/omega_moderne_client *.txt
 
 global-exclude *.py[co] __pycache__
 recursive-exclude .idea *

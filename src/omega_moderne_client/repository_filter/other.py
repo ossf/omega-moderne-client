@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict
 
-from omega_moderne_client.client.client_types import Repository
-from omega_moderne_client.repository_filter import Filter, FilterDetailedReason, FilterReason
+from ..client.client_types import Repository
+from . import Filter, FilterDetailedReason, FilterReason
 
 
 @dataclass(frozen=True)

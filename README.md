@@ -42,10 +42,16 @@ To install the CLI dependencies use the following command:
 pip install .[cli]
 ```
 
+For live development, you can use the following command to install the CLI in editable mode:
+```bash
+pip install -e .[cli]
+```
+To see more information about developing the CLI, see the [CONTRIBUTING](CONTRIBUTING.md) guide.
+
 To use it as a script, you can run it like this:
 
 ```bash
-./omega-moderne-client.py
+omega-moderne-client --help
 ```
 
 ### Library Usage

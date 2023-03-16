@@ -12,6 +12,15 @@ To run all tests and linting, run:
 tox
 ```
 
+## Live Development
+
+It's best practice to use pip's [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
+during development.
+
+```bash
+pip install --editable .
+```
+
 ## Suggested Development Environment
 
 Either IntelliJ or PyCharm can be used to develop this project.

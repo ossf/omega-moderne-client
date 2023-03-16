@@ -8,7 +8,7 @@ from omega_moderne_client.client.client_types import Repository
 from omega_moderne_client.repository_filter.filter_types import FilterDetailedReason, FilteredRecipeExecutionResult, \
     FilterReason
 
-__all__ = ['Filter']
+__all__ = ['Filter', 'FilterDetailedReason', 'FilterReason']
 
 
 class Filter(abc.ABC):
@@ -59,10 +59,12 @@ class Filter(abc.ABC):
     @staticmethod
     def _filter_for_filter_reason(filter_reason: FilterReason) -> 'Filter':
         # pylint: disable=import-outside-toplevel
-        from omega_moderne_client.repository_filter.github import GitHubRobotsTxtFilter  # pylint: disable=cyclic-import
+        from omega_moderne_client.repository_filter.github import \
+            GitHubRobotsTxtFilter  # pylint: disable=cyclic-import
         from omega_moderne_client.repository_filter.top_ten_thousand import \
             TopTenThousandProjects  # pylint: disable=cyclic-import
-        from omega_moderne_client.repository_filter.other import OtherRepositoryFilter  # pylint: disable=cyclic-import
+        from omega_moderne_client.repository_filter.other import \
+            OtherRepositoryFilter  # pylint: disable=cyclic-import
 
         if filter_reason is FilterReason.GH_ROBOTS_TXT:
             return GitHubRobotsTxtFilter()
