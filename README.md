@@ -1,6 +1,7 @@
 # Omega Moderne Client
 
 [![CI](https://github.com/ossf/omega-moderne-client/actions/workflows/ci.yml/badge.svg)](https://github.com/ossf/omega-moderne-client/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ossf/omega-moderne-client/branch/main/graph/badge.svg?token=C05nBupDo7)](https://codecov.io/gh/ossf/omega-moderne-client)
 
 This is a client for the [Moderne](https://moderne.io) API.
 It is how the [OpenSSF Alpha Omega](https://openssf.org/community/alpha-omega/) project generates
