@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# pylint: disable=invalid-name
 import argparse
+import asyncio
 import base64
 import json
 import sys
@@ -33,7 +31,7 @@ from omega_moderne_client.repository_filter import Filter, FilterDetailedReason,
 from omega_moderne_client.util import verbose_timedelta, headers
 
 console = Console()
-header = headers.HEADER_NORMAL
+HEADER = headers.HEADER_NORMAL
 layout = Layout()
 layout.split(
     Layout(name='header', size=17),
@@ -153,60 +151,60 @@ def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[Filt
     console.print(root)
 
 
-def run_recipe_maybe_generate_prs(args):
+async def run_recipe_maybe_generate_prs(args):
     if args.generate_prs:
         console.print("Generate prs enabled. Pull requests will be created!")
     else:
         console.print("Generate prs not enabled. No pull requests will be created!")
 
     campaign = Campaign.load(args.campaign_id)
-    client = ModerneClient.load_from_env(args.moderne_domain)
-    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
+    async with ModerneClient.load_from_env(args.moderne_domain) as client:
+        executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
 
-    console.print(f"Running campaign {campaign.name}...")
-    run_id = executor.launch_recipe(
-        campaign=campaign,
-        target_organization_id=args.moderne_organization
-    )
-    recipe_execution_result = executor.await_recipe(run_id=run_id)
+        console.print(f"Running campaign {campaign.name}...")
+        run_id = await executor.launch_recipe(
+            campaign=campaign,
+            target_organization_id=args.moderne_organization
+        )
+        recipe_execution_result = await executor.await_recipe(run_id=run_id)
 
-    repository_filter = Filter.create_all()
-    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
-    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+        repository_filter = Filter.create_all()
+        filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
+        print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
 
-    if not args.generate_prs:
-        console.print("Generate prs not enabled. Complete!")
-        sys.exit(0)
+        if not args.generate_prs:
+            console.print("Generate prs not enabled. Complete!")
+            sys.exit(0)
 
-    gpg_key_config = GpgKeyConfig.load_from_env()
-    console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
-    commit_id = executor.launch_pull_request(
-        campaign,
-        gpg_key_config,
-        filtered_recipe_execution_result
-    )
-    executor.await_pull_request(commit_id=commit_id)
-
-
-def recipe_attach(args):
-    client = ModerneClient.load_from_env(args.moderne_domain)
-    console.print(f"View live on Moderne https://{client.domain}/results/{args.run_id}")
-    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
-    recipe_execution_result = executor.await_recipe(args.run_id)
-    # Display the filtered repositories
-    repository_filter = Filter.create_all()
-    filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
-    print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+        gpg_key_config = GpgKeyConfig.load_from_env()
+        console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
+        commit_id = await executor.launch_pull_request(
+            campaign,
+            gpg_key_config,
+            filtered_recipe_execution_result
+        )
+        await executor.await_pull_request(commit_id=commit_id)
 
 
-def pr_attach(args):
-    client = ModerneClient.load_from_env(args.moderne_domain)
-    executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
-    executor.await_pull_request(args.commit_id)
+async def recipe_attach(args):
+    async with ModerneClient.load_from_env(args.moderne_domain) as client:
+        console.print(f"View live on Moderne https://{client.domain}/results/{args.run_id}")
+        executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
+        recipe_execution_result = await executor.await_recipe(args.run_id)
+        # Display the filtered repositories
+        repository_filter = Filter.create_all()
+        filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
+        print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+
+
+async def pr_attach(args):
+    async with ModerneClient.load_from_env(args.moderne_domain) as client:
+        executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
+        await executor.await_pull_request(args.commit_id)
 
 
 def cli():
-    console.print(header, justify="center")
+    console.print(HEADER, justify="center")
     parser = argparse.ArgumentParser(
         description='Run a campaign to fix security vulnerabilities using Moderne.',
         formatter_class=RichHelpFormatter
@@ -283,9 +281,9 @@ def cli():
         sys.exit(1)
 
     with Live(layout, console=console, redirect_stderr=False, refresh_per_second=1):
-        layout["header"].update(Align.center(Text(header, justify="center"), vertical="middle"))
+        layout["header"].update(Align.center(Text(HEADER, justify="center"), vertical="middle"))
         try:
-            args.func(args)
+            asyncio.run(args.func(args))
         except KeyboardInterrupt:
             console.print("Interrupted by user. Exiting...")
             sys.exit(130)
