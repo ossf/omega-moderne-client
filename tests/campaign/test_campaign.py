@@ -9,7 +9,3 @@ def test_load_one_campaign():
 def test_load_all_campaigns():
     campaigns = Campaign.load_all()
     assert len(campaigns) >= 6
-
-
-def test_failure():
-    assert False
