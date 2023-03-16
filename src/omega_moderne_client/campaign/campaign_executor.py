@@ -1,12 +1,12 @@
 import abc
-import time
+import asyncio
 from dataclasses import dataclass
 from typing import Any, List, Dict
 
+from .campaign import Campaign
+from ..client.client_types import RecipeRunSummary, Repository
 from ..client.gpg_key_config import GpgKeyConfig
 from ..client.moderne_client import ModerneClient
-from ..client.client_types import RecipeRunSummary, Repository
-from .campaign import Campaign
 
 
 @dataclass(frozen=True)
@@ -14,39 +14,39 @@ class CampaignExecutor:
     client: ModerneClient
     progress_monitor: 'CampaignExecutorProgressMonitor'
 
-    def launch_recipe(self, campaign: Campaign, target_organization_id="Default"):
-        run_id = self.client.run_campaign(
+    async def launch_recipe(self, campaign: Campaign, target_organization_id="Default"):
+        run_id = await self.client.run_campaign(
             campaign,
             target_organization_id=target_organization_id
         )
         self.progress_monitor.on_recipe_run_started(run_id)
         return run_id
 
-    def await_recipe(self, run_id: str) -> 'RecipeExecutionResult':
+    async def await_recipe(self, run_id: str) -> 'RecipeExecutionResult':
         previous = {}
         while True:
-            status = self.client.query_recipe_run_status(run_id)
+            status = await self.client.query_recipe_run_status(run_id)
             state = status["state"]
             if status != previous:
                 # Only print if the status has changed
-                recipe_run_summaries = self.client.query_recipe_run_sorted_by_results(run_id)
+                recipe_run_summaries = await self.client.query_recipe_run_sorted_by_results(run_id)
                 self.progress_monitor.on_recipe_progress(run_id, state, status["totals"], recipe_run_summaries)
                 previous = status
             if state in ("FINISHED", "CANCELED"):
                 self.progress_monitor.on_recipe_run_completed(run_id, state)
                 break
-            time.sleep(5)
+            await asyncio.sleep(5)
 
-        repositories_with_results = self.client.query_recipe_run_results_repositories(run_id)
+        repositories_with_results = await self.client.query_recipe_run_results_repositories(run_id)
         return RecipeExecutionResult(run_id=run_id, repositories=repositories_with_results)
 
-    def launch_pull_request(
+    async def launch_pull_request(
             self,
             campaign: Campaign,
             gpg_key_config: GpgKeyConfig,
             recipe_execution_result: 'RecipeExecutionResult'
     ) -> str:
-        commit_id = self.client.fork_and_pull_request(
+        commit_id = await self.client.fork_and_pull_request(
             recipe_execution_result.run_id,
             campaign,
             gpg_key_config,
@@ -55,15 +55,15 @@ class CampaignExecutor:
         self.progress_monitor.on_pull_request_generation_started(commit_id)
         return commit_id
 
-    def await_pull_request(self, commit_id: str):
+    async def await_pull_request(self, commit_id: str):
         while True:
-            job_state = self.client.query_commit_job_with_summary(commit_id)
+            job_state = await self.client.query_commit_job_with_summary(commit_id)
             state = job_state["state"]
             self.progress_monitor.on_pull_request_generation_progress(commit_id, state, job_state["commits"])
             if state != "RUNNING":
                 self.progress_monitor.on_pull_request_generation_completed(commit_id, state)
                 break
-            time.sleep(5)
+            await asyncio.sleep(5)
 
 
 @dataclass(frozen=True)

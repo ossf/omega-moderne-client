@@ -5,15 +5,17 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Any, Dict, Optional, TypeVar, Generic, cast, Union
+from types import TracebackType
+from typing import List, Any, Dict, Optional, TypeVar, Generic, cast, Union, Type
 
 from gql import gql, Client
+from gql.client import AsyncClientSession
 from gql.transport.aiohttp import AIOHTTPTransport
 # noinspection PyPackageRequirements
 from graphql import DocumentNode, ExecutionResult, GraphQLSchema
 
-from ..campaign.campaign import Campaign
 from .client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance
+from ..campaign.campaign import Campaign
 from ..client.gpg_key_config import GpgKeyConfig
 
 __all__ = ["ModerneClient"]
@@ -21,7 +23,11 @@ __all__ = ["ModerneClient"]
 
 class ClientWrapper(abc.ABC):
     @abc.abstractmethod
-    def execute(
+    async def connect(self) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def execute(
             self,
             document: DocumentNode,
             variable_values: Optional[Dict[str, Any]] = None,
@@ -29,7 +35,11 @@ class ClientWrapper(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_schema(self) -> GraphQLSchema:
+    async def get_schema(self) -> GraphQLSchema:
+        pass
+
+    @abc.abstractmethod
+    async def close(self) -> None:
         pass
 
 
@@ -38,8 +48,8 @@ class ModerneClient:
     domain: str
     _client: ClientWrapper
 
-    @staticmethod
-    def load_from_env(domain: str = "public.moderne.io") -> "ModerneClient":
+    @classmethod
+    def load_from_env(cls, domain: str = "public.moderne.io") -> "ModerneClient":
         token_file = Path.home().joinpath('.moderne/token.txt')
         api_token: str
         if token_file.exists():
@@ -56,7 +66,7 @@ class ModerneClient:
                     "`MODERNE_API_TOKEN` environment variable is not set!"
                 )
             api_token = read_token
-        return ModerneClient.create(api_token, domain=domain)
+        return cls.create(api_token, domain=domain)
 
     @staticmethod
     def create(moderne_api_token: str, domain: str = "public.moderne.io") -> "ModerneClient":
@@ -73,31 +83,57 @@ class ModerneClient:
         )
 
         class ModerneClientWrapper(ClientWrapper):
-            def execute(
+            session: AsyncClientSession = None
+
+            async def connect(self) -> None:
+                self.session = await client.connect_async(reconnecting=True)
+
+            async def execute(
                     self,
                     document: DocumentNode,
                     variable_values: Optional[Dict[str, Any]] = None,
             ) -> Union[Dict[str, Any], ExecutionResult]:
                 start = time.time()
+                if self.session is None:
+                    raise ValueError("Client is not connected! Did you use `async with` to wrap the ModerneClient?")
                 try:
-                    return client.execute(document, variable_values=variable_values)
+                    return await self.session.execute(document, variable_values=variable_values)
                 except asyncio.exceptions.TimeoutError as error:
                     end = time.time()
-                    raise TimeoutError(
+                    raise asyncio.exceptions.TimeoutError(
                         f"The Moderne API timed out after {end - start} seconds. Please try again later."
                     ) from error
 
-            def get_schema(self) -> GraphQLSchema:
+            async def get_schema(self) -> GraphQLSchema:
                 # Run a query to force the schema to get loaded
-                self.execute(gql("{ __schema { types { name } } }"))
+                await self.execute(gql("{ __schema { types { name } } }"))
                 return client.schema
+
+            async def close(self) -> None:
+                await client.close_async()
 
         return ModerneClient(
             domain=domain,
             _client=ModerneClientWrapper()
         )
 
-    def run_campaign(self, campaign: Campaign, target_organization_id: str = "Default", priority: str = "LOW") -> str:
+    async def __aenter__(self) -> "ModerneClient":
+        await self._client.connect()
+        return self
+
+    async def close(self):
+        await self._client.close()
+
+    async def __aexit__(
+            self,
+            exc_type: Optional[Type[BaseException]] = None,
+            exc_val: Optional[BaseException] = None,
+            exc_tb: Optional[TracebackType] = None,
+    ) -> None:
+        await self.close()
+
+    async def run_campaign(self, campaign: Campaign, target_organization_id: str = "Default",
+                           priority: str = "LOW") -> str:
         """
         Runs a campaign on the target organization.
         :param campaign: The campaign to execute.
@@ -123,10 +159,10 @@ class ModerneClient:
             "priority": priority
         }
         # Execute the query on the transport
-        result = self._client.execute(run_fix_query, variable_values=params)
+        result = await self._client.execute(run_fix_query, variable_values=params)
         return result["runYamlRecipe"]["id"]
 
-    def query_recipe_run_status(self, recipe_run_id: str) -> Dict[str, Any]:
+    async def query_recipe_run_status(self, recipe_run_id: str) -> Dict[str, Any]:
         recipe_run_results = gql(
             # language=GraphQL
             """
@@ -149,37 +185,43 @@ class ModerneClient:
             """
         )
         params = {"id": recipe_run_id}
-        result = self._client.execute(recipe_run_results, variable_values=params)
+        result = await self._client.execute(recipe_run_results, variable_values=params)
         return result["recipeRun"]
 
-    def query_recipe_run(
+    async def query_recipe_run(
             self,
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None
     ) -> List['RecipeRunSummary']:
-        return GetRecipeRunSummaryResults(self._client).get_all(recipe_run_id, filter_by=filter_by)
+        return await GetRecipeRunSummaryResults(self._client).get_all(recipe_run_id, filter_by=filter_by)
 
-    def query_recipe_run_sorted_by_results(self, recipe_run_id: str) -> List['RecipeRunSummary']:
-        return GetRecipeRunSummaryResults(self._client).get_all(
-            recipe_run_id,
-            filter_by={'statuses': ['FINISHED'], 'onlyWithResults': True},
-            order_by={'direction': 'DESC', 'field': 'TOTAL_RESULTS'}
-        ) + GetRecipeRunSummaryResults(self._client).get_first_page(
-            recipe_run_id,
-            filter_by={'statuses': ['ERROR', 'LOADING', 'QUEUED', 'RUNNING', 'CREATED', 'UNAVAILABLE']},
+    async def query_recipe_run_sorted_by_results(self, recipe_run_id: str) -> List['RecipeRunSummary']:
+        all_finished, unfinished = await asyncio.gather(
+            GetRecipeRunSummaryResults(self._client).get_all(
+                recipe_run_id,
+                filter_by={'statuses': ['FINISHED'], 'onlyWithResults': True},
+                order_by={'direction': 'DESC', 'field': 'TOTAL_RESULTS'}
+            ),
+            GetRecipeRunSummaryResults(self._client).get_first_page(
+                recipe_run_id,
+                filter_by={'statuses': ['ERROR', 'LOADING', 'QUEUED', 'RUNNING', 'CREATED', 'UNAVAILABLE']},
+            )
         )
+        return all_finished + unfinished
 
-    def query_recipe_run_repositories(
+    async def query_recipe_run_repositories(
             self,
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None
     ) -> List['Repository']:
-        return [summary.repository for summary in self.query_recipe_run(recipe_run_id, filter_by)]
+        return [summary.repository for summary in await self.query_recipe_run(recipe_run_id, filter_by)]
 
-    def query_recipe_run_results_repositories(self, recipe_run_id: str) -> List['Repository']:
-        return self.query_recipe_run_repositories(recipe_run_id, {'statuses': ['FINISHED'], 'onlyWithResults': True})
+    async def query_recipe_run_results_repositories(self, recipe_run_id: str) -> List['Repository']:
+        return await self.query_recipe_run_repositories(
+            recipe_run_id, {'statuses': ['FINISHED'], 'onlyWithResults': True}
+        )
 
-    def fork_and_pull_request(
+    async def fork_and_pull_request(
             self,
             recipe_id: str,
             campaign: Campaign,
@@ -227,13 +269,13 @@ class ModerneClient:
             "pullRequestTitle": campaign.pr_title,
             "pullRequestBody": base64.b64encode(campaign.pr_body.encode()).decode()
         }
-        result = self._client.execute(fork_and_pull_request_query, variable_values=params)
+        result = await self._client.execute(fork_and_pull_request_query, variable_values=params)
         return result["forkAndPullRequest"]["id"]
 
-    def query_commit_job_commits(self, commit_job_id: str) -> List[Commit]:
-        return GetCommitJobCommits(self._client).call(commit_job_id)
+    async def query_commit_job_commits(self, commit_job_id: str) -> List[Commit]:
+        return await GetCommitJobCommits(self._client).call(commit_job_id)
 
-    def query_commit_job_with_summary(self, commit_job_id: str) -> Dict[str, Any]:
+    async def query_commit_job_with_summary(self, commit_job_id: str) -> Dict[str, Any]:
         commit_job_summary_query = gql(
             # language=GraphQL
             """
@@ -252,15 +294,15 @@ class ModerneClient:
             """
         )
         params = {"id": commit_job_id}
-        result = self._client.execute(
+        result = await self._client.execute(
             commit_job_summary_query,
             variable_values=params
         )
         return result["commitJob"]
 
-    def query_commit_job_status(self, commit_job_id: str) -> Dict[str, Any]:
-        results: List[Commit] = self.query_commit_job_commits(commit_job_id)
-        commit_job = self.query_commit_job_with_summary(commit_job_id)
+    async def query_commit_job_status(self, commit_job_id: str) -> Dict[str, Any]:
+        results: List[Commit] = await self.query_commit_job_commits(commit_job_id)
+        commit_job = await self.query_commit_job_with_summary(commit_job_id)
         summary_results = commit_job["summaryResults"]
         state: str
         if "state" in commit_job:
@@ -282,10 +324,10 @@ class ModerneClient:
         commit_job["state"] = state
         return commit_job
 
-    def schema(self) -> str:
+    async def schema(self) -> str:
         # noinspection PyPackageRequirements
         from graphql import print_schema  # pylint: disable=import-outside-toplevel
-        return print_schema(self._client.get_schema())
+        return print_schema(await self._client.get_schema())
 
 
 T = TypeVar('T')
@@ -303,33 +345,33 @@ class PagedQuery(abc.ABC, Generic[T]):
     def map_node(self, node: Dict[str, Any]) -> T:
         return cast(T, node)
 
-    def request_page(self, after: Optional[str], **kwargs) -> dict:
+    async def request_page(self, after: Optional[str], **kwargs) -> dict:
         """
         Execute a paged query. Return the page of results.
         """
         params = {"after": after}
         params.update(kwargs)
-        return self.client.execute(self.query, variable_values=params)
+        return await self.client.execute(self.query, variable_values=params)
 
-    def request_all(self, **kwargs) -> List[T]:
+    async def request_all(self, **kwargs) -> List[T]:
         """
         Take a paged query and return all results.
         """
         next_after = None
         results: List[T] = []
         while True:
-            paged = self.map_page(self.request_page(next_after, **kwargs))
+            paged = self.map_page(await self.request_page(next_after, **kwargs))
             results.extend([self.map_node(edge["node"]) for edge in paged["edges"]])
             if not paged["pageInfo"]["hasNextPage"]:
                 break
             next_after = paged["pageInfo"]["endCursor"]
         return results
 
-    def get_page_results(self, after: Optional[str], **kwargs) -> List[T]:
+    async def get_page_results(self, after: Optional[str], **kwargs) -> List[T]:
         """
         Execute a paged query. Return the page of results.
         """
-        paged = self.map_page(self.request_page(after, **kwargs))
+        paged = self.map_page(await self.request_page(after, **kwargs))
         return [self.map_node(edge["node"]) for edge in paged["edges"]]
 
 
@@ -386,7 +428,7 @@ class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
         node["repository"] = Repository(**node["repository"])
         return RecipeRunSummary(**node)
 
-    def get_first_page(
+    async def get_first_page(
             self,
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None,
@@ -398,9 +440,9 @@ class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
         if order_by:
             args["orderBy"] = order_by
         # https://github.com/google/pytype/issues/1395
-        return self.get_page_results(None, **args)  # pytype: disable=bad-return-type
+        return await self.get_page_results(None, **args)  # pytype: disable=bad-return-type
 
-    def get_all(
+    async def get_all(
             self,
             recipe_run_id: str,
             filter_by: Optional[Dict[str, Any]] = None,
@@ -412,7 +454,7 @@ class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
         if order_by:
             args["orderBy"] = order_by
         # https://github.com/google/pytype/issues/1395
-        return self.request_all(**args)  # pytype: disable=bad-return-type
+        return await self.request_all(**args)  # pytype: disable=bad-return-type
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["recipeRun"]["summaryResultsPages"]
@@ -464,13 +506,18 @@ class GetCommitJobCommits(PagedQuery[Commit]):
         node["repository"] = Repository(**node["repository"])
         return Commit(**node)
 
-    def call(self, commit_job_id: str) -> List[Commit]:
+    async def call(self, commit_job_id: str) -> List[Commit]:
         # https://github.com/google/pytype/issues/1395
-        return self.request_all(**{"id": commit_job_id})  # pytype: disable=bad-return-type
+        return await self.request_all(**{"id": commit_job_id})  # pytype: disable=bad-return-type
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["commitJob"]["commits"]
 
 
 if __name__ == "__main__":
-    print(ModerneClient.load_from_env().schema())
+    async def main():
+        async with ModerneClient.load_from_env() as client:
+            print(await client.schema())
+
+
+    asyncio.run(main())
