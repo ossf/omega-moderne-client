@@ -1,6 +1,8 @@
 # Omega Moderne Client
 
-This is a client for the Moderne SaaS API (https://moderne.io).
+[![CI](https://github.com/ossf/omega-moderne-client/actions/workflows/ci.yml/badge.svg)](https://github.com/ossf/omega-moderne-client/actions/workflows/ci.yml)
+
+This is a client for the [Moderne](https://moderne.io) API.
 It is how the [OpenSSF Alpha Omega](https://openssf.org/community/alpha-omega/) project generates
 automated pull requests to fix vulnerabilities, at-scale, across the entire open source ecosystem.
 
