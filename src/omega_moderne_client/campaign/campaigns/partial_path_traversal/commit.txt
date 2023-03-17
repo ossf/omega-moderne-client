@@ -12,7 +12,7 @@ however, `println(new File("/var", "/").getCanonicalPath())` will print `/var`.
 
 Weakness: CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')
 Severity: Medium
-CVSSS: 6.1
+CVSS: 6.1
 Detection: CodeQL & OpenRewrite (https://public.moderne.io/recipes/org.openrewrite.java.security.PartialPathTraversalVulnerability)
 
 Reported-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>

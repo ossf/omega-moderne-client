@@ -1,0 +1,10 @@
+branch_name: fix/JLL/use_https_to_resolve_dependencies_maven
+recipe:
+  id: org.openrewrite.maven.security.UseHttpsForRepositories
+  source: https://github.com/openrewrite/rewrite/blob/main/rewrite-maven/src/main/java/org/openrewrite/maven/security/UseHttpsForRepositories.java
+
+codeql_query:
+  link: https://codeql.github.com/codeql-query-help/java/java-maven-non-https-url/
+
+tracking:
+  link: https://github.com/JLLeitschuh/security-research/issues/8

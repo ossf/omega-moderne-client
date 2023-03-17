@@ -6,10 +6,4 @@ using the `Files.createTempFile()` method which sets the correct posix permissio
 
 Weakness: CWE-377: Insecure Temporary File
 Severity: Medium
-CVSSS: 5.5
-Detection: CodeQL & OpenRewrite (https://public.moderne.io/recipes/org.openrewrite.java.security.SecureTempFileCreation)
-
-Reported-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>
-Signed-off-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>
-
-Bug-tracker: https://github.com/JLLeitschuh/security-research/issues/18
+CVSS: 5.5

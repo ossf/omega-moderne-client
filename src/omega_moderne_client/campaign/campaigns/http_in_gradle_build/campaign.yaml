@@ -1,0 +1,7 @@
+branch_name: fix/JLL/use_https_to_resolve_dependencies_gradle
+recipe:
+  id: org.openrewrite.gradle.security.UseHttpsForRepositories
+  source: https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/security/UseHttpsForRepositories.java
+
+tracking:
+  link: https://github.com/JLLeitschuh/security-research/issues/9

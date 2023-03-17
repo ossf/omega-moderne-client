@@ -1,0 +1,7 @@
+branch_name: fix/JLL/temporary_directory_hijacking_or_temporary_directory_information_disclosure
+recipe:
+  id: org.openrewrite.java.security.UseFilesCreateTempDirectory
+  source: https://github.com/openrewrite/rewrite-java-security/blob/main/src/main/java/org/openrewrite/java/security/UseFilesCreateTempDirectory.java
+
+tracking:
+  link: https://github.com/JLLeitschuh/security-research/issues/10

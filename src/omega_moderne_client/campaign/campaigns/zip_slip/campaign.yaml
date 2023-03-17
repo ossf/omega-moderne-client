@@ -1,0 +1,10 @@
+branch_name: fix/JLL/zip-slip-vulnerability
+recipe:
+  id: org.openrewrite.java.security.ZipSlip
+  source: https://github.com/openrewrite/rewrite-java-security/blob/main/src/main/java/org/openrewrite/java/security/ZipSlip.java
+
+codeql_query:
+  link: https://codeql.github.com/codeql-query-help/java/java-zipslip/
+
+tracking:
+  link: https://github.com/JLLeitschuh/security-research/issues/16
