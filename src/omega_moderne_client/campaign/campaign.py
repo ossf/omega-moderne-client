@@ -1,4 +1,5 @@
 import base64
+import re
 from dataclasses import dataclass
 from importlib.abc import Traversable
 from importlib.resources import files
@@ -129,7 +130,7 @@ class CampaignGlobals:
         resource = _campaigns_dir().joinpath(path)
         # noinspection PyTypeChecker
         with open(resource, 'r', encoding='utf-8') as file:  # pytype: disable=wrong-arg-types
-            return file.read()
+            return re.sub(r'^<!-- vim:.*\n', '', file.read(), flags=re.MULTILINE)
 
 
 def _campaigns_dir() -> Traversable:

@@ -98,6 +98,7 @@ class TestCampaign(AsyncTestCase):
             line.startswith('Signed-off-by: ') for line in lines), f"Missing 'Signed-off-by:' in {commit_extended}"
 
     async def assert_pr_body_is_sane(self, pr_body: str):
+        assert not any(line.startswith('<!-- vim:') for line in pr_body.splitlines())
         links = get_links_from_markdown(pr_body)
         await asyncio.gather(*map(self.assert_link_is_valid, links))
 
