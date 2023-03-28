@@ -13,7 +13,7 @@ This leaves your build vulnerable to allowing a [Man in the Middle](https://en.w
 This vulnerability has a CVSS v3.0 Base Score of [8.1/10](https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?vector=AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H).
 
 [POC code](https://max.computer/blog/how-to-take-over-the-computer-of-any-java-or-clojure-or-scala-developer/) has existed since 2014 to maliciously compromise a JAR file in-flight.
-MITM attacks against HTTP are [increasingly common](https://security.stackexchange.com/a/12050), for example [Comcast is known to have done it to their own users](https://thenextweb.com/news/comcast-continues-to-inject-its-own-code-into-websites-you-visit).
+MITM attacks against HTTP are [increasingly common](https://security.stackexchange.com/a/12050), for example [a major ISP is known to have done it to their own users](https://thenextweb.com/news/comcast-continues-to-inject-its-own-code-into-websites-you-visit).
 
 ## References
 
