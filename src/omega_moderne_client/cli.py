@@ -9,10 +9,13 @@ from typing import Dict, Any, List
 try:
     from isodate import parse_duration
     from rich.align import Align
-    from rich.console import Console
+    from rich.console import Console, Group
+    from rich.emoji import Emoji
     from rich.layout import Layout
     from rich.live import Live
     from rich.markup import escape
+    from rich.markdown import Markdown
+    from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
     from rich.tree import Tree
@@ -203,6 +206,39 @@ async def pr_attach(args):
         await executor.await_pull_request(args.commit_id)
 
 
+async def print_campaign(args):
+    def bright_white(string: str) -> str:
+        return f"[bright_white]{string}[/bright_white]"
+
+    def orange(string: str) -> str:
+        return f"[orange3]{string}[/orange3]"
+
+    def green(string: str) -> str:
+        return f"[green]{string}[/green]"
+
+    def bright_magenta(string: str) -> str:
+        return f"[bright_magenta]{string}[/bright_magenta]"
+
+    def bold(string: str) -> str:
+        return f"[bold]{string}[/bold]"
+
+    campaign = Campaign.load(args.campaign_id)
+    root = Tree(
+        f"{bright_magenta(bold('Campaign('))}name={bright_white(campaign.name)}{bright_magenta(bold(')'))}"
+    )
+    root.add(f"{orange('Recipe Id:')} {green(campaign.recipe_id)}")
+    root.add(f"{orange('Branch:')} {green(campaign.branch)}")
+    root.add(Group(
+        orange("Commit Message:"),
+        Panel(campaign.commit_title + '\n' + campaign.commit_extended, border_style="green")
+    ))
+    root.add(Group(
+        orange("Pull Request Body:"),
+        Panel(Markdown(Emoji.replace('# ' + campaign.pr_title + '\n' + campaign.pr_body)), border_style="green")
+    ))
+    console.print(root)
+
+
 def cli():
     console.print(HEADER, justify="center")
     parser = argparse.ArgumentParser(
@@ -275,15 +311,33 @@ def cli():
         help='The Moderne commit id to attach to.'
     )
 
+    campaign_printer_parser = subparsers.add_parser(
+        'campaign',
+        help='Print data about a campaign.',
+        formatter_class=RichHelpFormatter,
+        parents=[parent],
+    )
+    campaign_printer_parser.add_argument(
+        'campaign_id',
+        type=str,
+        choices=Campaign.list_campaigns(),
+        help='The campaign to to print.'
+    )
+    campaign_printer_parser.set_defaults(func=print_campaign)
+    campaign_printer_parser.set_defaults(not_live=True)
+
     args = parser.parse_args()
     if not hasattr(args, 'func'):
         parser.print_help()
         sys.exit(1)
 
-    with Live(layout, console=console, redirect_stderr=False, refresh_per_second=1):
-        layout["header"].update(Align.center(Text(HEADER, justify="center"), vertical="middle"))
-        try:
+    try:
+        if hasattr(args, 'not_live') and args.not_live:
             asyncio.run(args.func(args))
-        except KeyboardInterrupt:
-            console.print("Interrupted by user. Exiting...")
-            sys.exit(130)
+        else:
+            with Live(layout, console=console, redirect_stderr=False, refresh_per_second=1):
+                layout["header"].update(Align.center(Text(HEADER, justify="center"), vertical="middle"))
+                asyncio.run(args.func(args))
+    except KeyboardInterrupt:
+        console.print("Interrupted by user. Exiting...")
+        sys.exit(130)

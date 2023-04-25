@@ -11,7 +11,6 @@ from typing import List, Any, Dict, Optional, TypeVar, Generic, cast, Union, Typ
 from gql import gql, Client
 from gql.client import AsyncClientSession
 from gql.transport.aiohttp import AIOHTTPTransport
-# noinspection PyPackageRequirements
 from graphql import DocumentNode, ExecutionResult, GraphQLSchema
 
 from .client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance
@@ -439,8 +438,7 @@ class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
             args["filterBy"] = filter_by
         if order_by:
             args["orderBy"] = order_by
-        # https://github.com/google/pytype/issues/1395
-        return await self.get_page_results(None, **args)  # pytype: disable=bad-return-type
+        return await self.get_page_results(None, **args)
 
     async def get_all(
             self,
@@ -453,8 +451,7 @@ class GetRecipeRunSummaryResults(PagedQuery[RecipeRunSummary]):
             args["filterBy"] = filter_by
         if order_by:
             args["orderBy"] = order_by
-        # https://github.com/google/pytype/issues/1395
-        return await self.request_all(**args)  # pytype: disable=bad-return-type
+        return await self.request_all(**args)
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["recipeRun"]["summaryResultsPages"]
@@ -507,8 +504,7 @@ class GetCommitJobCommits(PagedQuery[Commit]):
         return Commit(**node)
 
     async def call(self, commit_job_id: str) -> List[Commit]:
-        # https://github.com/google/pytype/issues/1395
-        return await self.request_all(**{"id": commit_job_id})  # pytype: disable=bad-return-type
+        return await self.request_all(**{"id": commit_job_id})
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
         return data["commitJob"]["commits"]

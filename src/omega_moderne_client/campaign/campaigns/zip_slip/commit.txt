@@ -16,10 +16,4 @@ however, `println(new File("/var", "/").getCanonicalPath())` will print `/var`.
 
 Weakness: CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')
 Severity: High
-CVSSS: 7.4
-Detection: CodeQL (https://codeql.github.com/codeql-query-help/java/java-zipslip/) & OpenRewrite (https://public.moderne.io/recipes/org.openrewrite.java.security.ZipSlip)
-
-Reported-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>
-Signed-off-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>
-
-Bug-tracker: https://github.com/JLLeitschuh/security-research/issues/16
+CVSS: 7.4

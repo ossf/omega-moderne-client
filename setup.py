@@ -20,7 +20,9 @@ setup(
     python_requires='>=3.9',
     install_requires=[
         "gql[all]>=3.4.0",
-        "requests>=2.28.2"
+        "requests>=2.28.2",
+        "PyYAML>=6.0",
+        "python-liquid>=1.8.1"
     ],
     extras_require={
         "cli": [
@@ -31,6 +33,13 @@ setup(
         "github-scripts": [
             "croniter>=1.3.8",
             "pytz>=2022",
+        ],
+        "test": [
+            "pytest>=6",
+            "pytest-cov",
+            "Markdown>=3.4.1",
+            "aiohttp>=3.8.4",
+            "aiounittest>=1.4.2"
         ]
     },
     entry_points={

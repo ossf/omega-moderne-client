@@ -6,10 +6,4 @@ HTTPS.
 
 Weakness: CWE-829: Inclusion of Functionality from Untrusted Control Sphere
 Severity: High
-CVSSS: 8.1
-Detection: OpenRewrite
-
-Reported-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>
-Signed-off-by: Jonathan Leitschuh <Jonathan.Leitschuh@gmail.com>
-
-Bug-tracker: https://github.com/JLLeitschuh/security-research/issues/9
+CVSS: 8.1
