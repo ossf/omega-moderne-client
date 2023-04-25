@@ -30,9 +30,22 @@ interface ToolConfiguration {
 
 union ScmConfiguration = BitbucketCloudConfiguration | BitbucketConfiguration | GitLabConfiguration | GithubConfiguration
 
+"Moderne Personal Access Tokens"
 type AccessToken {
+    "The date and time the token was created."
     created: DateTime!
+    """
+
+    Optional description of the token.
+
+    Useful for distinguishing between multiple tokens.
+    """
     description: String
+    """
+
+    The unique identifier for the access token.
+    This is not the same as the token itself.
+    """
     id: ID!
 }
 
@@ -132,6 +145,7 @@ type BitbucketCloudConfiguration implements ToolConfiguration {
     agents(after: String, first: Int): AgentIndexConnection!
     " Shared fields"
     id: ID!
+    "Whether the current user has an active OAUth authorization"
     isAuthorized: Boolean!
     "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
     isSkipSsl: Boolean!
@@ -169,6 +183,7 @@ type BitbucketConfiguration implements ToolConfiguration {
     alternateUrls: [String!]!
     " Shared fields"
     id: ID!
+    "Whether the current user has an active OAUth authorization"
     isAuthorized: Boolean!
     "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
     isSkipSsl: Boolean!
@@ -261,6 +276,27 @@ type CommitJobSummary {
     successfulCount: Int!
 }
 
+type CommitsReportDownloadTask {
+    fileSize: Long!
+    id: ID!
+    state: CommitsReportTaskState!
+    stateMessage: String
+    url: String
+}
+
+type Contributor {
+    email: String!
+    lineCount: Int!
+    name: String!
+}
+
+type CustomRecipe {
+    description: String!
+    id: ID!
+    name: String!
+    yaml: Base64!
+}
+
 type DataTable {
     columns: [Column!]!
     description: String!
@@ -294,12 +330,47 @@ type DataTableDownloadTask {
 }
 
 type Event {
+    """
+
+    The action that was performed
+
+    Example: `GET_RECIPE`
+    """
     action: String!
+    """
+
+    The type of action that was performed
+
+    Example: `Read`
+    """
     actionType: ActionType!
+    """
+
+    Extended description of the logged event
+
+    Example:
+    ```
+    Get a specific recipe and its details.
+    ```
+    """
     description: Markdown!
+    """
+
+    The outcome of the action
+
+    Generally be either: `Success` or `Failed`
+    """
     outcome: String
+    """
+
+    The target of the event
+
+    Example: `recipes` or `recipe.runs`
+    """
     target: String!
+    "The time the event was logged"
     timestamp: DateTime!
+    "Unique identifier for the user that triggered the event"
     userId: String!
 }
 
@@ -364,6 +435,7 @@ type GitLabConfiguration implements ToolConfiguration {
     agents(after: String, first: Int): AgentIndexConnection!
     " Shared fields"
     id: ID!
+    "Whether the current user has an active OAUth authorization"
     isAuthorized: Boolean!
     "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
     isSkipSsl: Boolean!
@@ -407,6 +479,7 @@ type GithubConfiguration implements ToolConfiguration {
     allowableOrganizations: [String!]!
     " Shared fields"
     id: ID!
+    "Whether the current user has an active OAUth authorization"
     isAuthorized: Boolean!
     "If `true`, Moderne will not validate SSL certificates when connecting to this tool."
     isSkipSsl: Boolean!
@@ -508,10 +581,23 @@ type Mutation {
     No guarantees are made about when or if the cancellation will complete.
     """
     cancelRecipeRun(id: ID!): ID!
+    cancelRecipeRunValidation(id: ID!): Boolean!
     "Push a branch to the origin remote."
     commit(commit: CommitInput): CommitJob!
+    """
+
+    Creates a Moderne Personal Access Tokens for authenticating to the Moderne Platform API.
+
+    These tokens are limited in scope and cannot be used to perform queries and mutations that require an administrative role.
+    """
     createAccessToken(description: String): String!
-    "Requires administrative access"
+    """
+
+    Delete all access tokens for a given email address.
+
+    Useful for cleaning up after a user has been removed from an organization.
+    Requires administrative access
+    """
     deleteAllAccessTokens(email: String!): Boolean!
     """
 
@@ -521,6 +607,17 @@ type Mutation {
     """
     deleteAstsOlderThan(modifiedTimestamp: DateTime!): Int
     deleteRecipeArtifact(artifactId: String!, groupId: String!): Boolean
+    deleteRecipeRunHistory(email: String): Int!
+    """
+
+    Removes a repository and all associated artifacts from the database by location
+
+    Requires administrative role.
+    """
+    deleteRepositoriesByUrl(
+        "Example: `http://example.com/artifactory`"
+        url: String!
+    ): Boolean
     "Removes a Repository and all associated artifacts from the database."
     deleteRepository(repositoryInput: RepositoryInput!): Boolean
     """
@@ -533,6 +630,14 @@ type Mutation {
         "Example: `moderne-public/cobol-sample-repo/`"
         location: String!
     ): Boolean
+    """
+
+    Download a report of all commits, successful and failed, since `since` (default: 30 days ago)
+
+    Requires querying `commitsReportDownload` to get the status. The result of `commitsReportDownload` will
+    contain a URL to download the resulting report.
+    """
+    downloadCommitsReport(since: DateTime): CommitsReportDownloadTask!
     "Initiate a download task (requires polling `dataTableDownload` query to check for completion)"
     downloadDataTable(
         dataTable: String!,
@@ -540,6 +645,8 @@ type Mutation {
         format: DataTableFormat! = CSV,
         recipeRunId: ID!
     ): DataTableDownloadTask!
+    "Initiate a download task of all recipe runs in the past three days (requires polling `recipeRunReportDownload` query to check for completion)"
+    downloadRecipeRunReport: RecipeRunReportDownloadTask!
     """
 
     Bitbucket Server OAuth 1.0a - Exchange request token and verifier for Access Token. Successfully exchanged access
@@ -695,7 +802,11 @@ type Mutation {
     effectively invisible to the service until it is un-quarantined
     """
     quarantineRepository(repositoryInput: RepositoryInput!): Repository
+    "Queue up validation jobs for validating project builds with recipe changes. Incubating and admin only."
+    queueRecipeRunValidation(validationInput: RecipeValidationInput!): Boolean!
+    refreshOrganizations: Boolean!
     rerunFailedCommitJob(gpgKeys: GpgInput, id: ID!, scmAccessTokens: [ScmAccessToken!]): ID!
+    "Revokes a Moderne Personal Access Token."
     revokeAccessToken(id: ID!): Boolean!
     "Remove all your active SCM OAuth tokens from the platform."
     revokeAllScmTokens: Boolean!
@@ -730,8 +841,9 @@ type Organization {
     commitOptions: [CommitOption!]!
     id: ID!
     name: String!
-    repositories: [Repository!]!
-    repositoryCount: Int!
+    repositories: [Repository!]! @deprecated(reason: "Use repositoriesPages instead.")
+    repositoriesPages(after: String, filter: RepositoryFilter = {showOrphaned: false, sortBy: PATH, sortOrder: ASC}, first: Int = 100): RepositoryConnection!
+    repositoryCount: Int! @deprecated(reason: "Use repositoriesPaged.count instead.")
 }
 
 type OrganizationConfiguration implements ToolConfiguration {
@@ -745,6 +857,11 @@ type OrganizationConfiguration implements ToolConfiguration {
     resourceId: String!
     "If `true`, Moderne has successfully validated the configuration and possibly connectivity to this tool."
     valid: Boolean!
+}
+
+type OrganizationSummary {
+    id: ID!
+    name: String!
 }
 
 "A repository which originates from a source control management tool for which there is no agent connected."
@@ -787,7 +904,14 @@ type PullRequestStatistics {
 }
 
 type Query {
+    """
+
+    Returns all active access tokens for a given email address.
+
+    Requires administrative access
+    """
     accessTokenEmails: [String!]!
+    "Returns all active access tokens for the current user."
     accessTokens: [AccessToken!]!
     "Get all currently active recipes by a user id (passed via header), sorted by most recent."
     activeRecipeRuns(limit: Int, sortOrder: SortOrder = DESC): [RecipeRun!]!
@@ -805,6 +929,14 @@ type Query {
     commitJob(id: ID!): CommitJob
     "Sorted in descending order of start time"
     commitJobs(after: String, first: Int = 50): CommitJobConnection!
+    "Check the status of a commits report download task."
+    commitsReportDownload(id: ID!): CommitsReportDownloadTask
+    """
+
+    Get the custom recipe for a given recipe run id. Still present after the recipe
+    run results are no longer available.
+    """
+    customRecipeForRecipeRun(recipeRunId: ID!): CustomRecipe
     "Poll to see if a data table download task has completed."
     dataTableDownload(id: ID!): DataTableDownloadTask!
     """
@@ -817,7 +949,8 @@ type Query {
     has read access to that repository.
     """
     dataTableRepositoryOrigins(dataTable: String!, recipeRunId: ID!): [String!]!
-    events(after: String, filter: EventFilterInput, first: Int): EventConnection!
+    "Paginated result of events that have been logged"
+    events(after: String, filter: EventFilterInput, filters: AuditLogFilterInput, first: Int): EventConnection!
     findRepositories(repositoryQuery: RepositoryInput!): [Repository!]!
     findRepository(repositoryQuery: RepositoryInput!): Repository
     """
@@ -844,6 +977,8 @@ type Query {
         id: ID!
     ): Organization!
     organizationExists(repository: RepositoryInput!): Boolean!
+    "Returns a list of the organization summaries containing the known id and name for each organization."
+    organizationSummaries: [OrganizationSummary!]!
     organizations(
         "Filter organizations by id"
         id: ID
@@ -863,6 +998,8 @@ type Query {
     recipeDeployment(id: ID!): RecipeDeploymentResult!
     recipeDeployments(state: RecipeDeploymentState): [RecipeDeploymentResult!]!
     recipeRun(id: ID!): RecipeRun!
+    "Poll to see if a recipe run report download task has completed."
+    recipeRunReportDownload(id: ID!): RecipeRunReportDownloadTask
     "Used to fetch meta information about a recipe result for a particular repository."
     recipeRunSummaryByRepository(
         "Recipe Run ID"
@@ -870,9 +1007,16 @@ type Query {
         "Example: {\"scmType\":\"GITHUB\",\"origin\":\"git@...\",\"path\":\"Netflix/eureka\",\"branch\":\"main\"}"
         repositoryInput: RepositoryInput!
     ): RecipeRunSummary!
+    "Returns a paginated list of known repository identifiers"
+    repositories(after: String, filter: RepositoryFilter = {showOrphaned: false, sortBy: PATH, sortOrder: ASC}, first: Int = 100): RepositoryConnection!
     "Returns the list of known repository identifiers"
-    repositoryIndex(showOrphaned: Boolean = false): [Repository!]
-    scm(resourceId: String!): ScmConfiguration
+    repositoryIndex(showOrphaned: Boolean = false): [Repository!] @deprecated(reason: "Use `repositories` which is paginated for improved performance.")
+    "Get the configuration for a specific SCM by the `resourceId`"
+    scm(
+        "Example: `https://github.com`"
+        resourceId: String!
+    ): ScmConfiguration
+    "Returns configuration for all SCM providers that have been configured through the Moderne Agent."
     scms: [ScmConfiguration!]!
     "Search for recipes matching the supplied search query."
     searchRecipes(after: String, first: Int = 50, query: String!, sortBy: RecipeSortKey = DEFAULT, sortOrder: SortOrder = DESC): RecipeSearchConnection!
@@ -893,14 +1037,19 @@ type Query {
 }
 
 type Recipe {
+    "Contributors to the recipe based on git"
+    contributors: [Contributor!]
     dataTables: [DataTable!]!
     description: Markdown
     "Example: `org.openrewrite.java.testing.junit5.IgnoreToDisabled`"
     id: ID!
     languages: [String!]!
+    "Curated list of verified maintainers of the recipe"
     maintainers: [Maintainer!]
     name: Markdown!
     options: [Option!]!
+    "Link to run the recipe through the Moderne UI."
+    permalink: String!
     recipeArtifact: RecipeArtifact
     recipeList: [Recipe!]!
     """
@@ -912,6 +1061,7 @@ type Recipe {
     tags: [String!]!
     timeSavings: Duration
     totalRecipes: Int!
+    yaml: Base64
 }
 
 type RecipeArtifact {
@@ -962,6 +1112,7 @@ type RecipeDeploymentResult {
 
 type RecipeRun {
     email: String
+    end: DateTime
     id: ID!
     "The id of the organization the recipe was ran under."
     organizationId: ID
@@ -977,6 +1128,7 @@ type RecipeRun {
 }
 
 type RecipeRunHistory {
+    end: DateTime
     recipe: Recipe! @deprecated(reason: "Use recipeRun instead.")
     recipeRun: RecipeRun!
     runId: ID!
@@ -998,6 +1150,14 @@ type RecipeRunHistoryEdge {
 type RecipeRunPerformance {
     astLoading: Duration
     recipeRun: Duration
+}
+
+type RecipeRunReportDownloadTask {
+    fileSize: Long!
+    id: ID!
+    state: DownloadTaskState!
+    stateMessage: String
+    url: String
 }
 
 type RecipeRunSummary {
@@ -1026,6 +1186,8 @@ type RecipeRunSummary {
     "Total number of markers in a file. Search markers are not visible in a patch or cannot be committed to the repository."
     totalResults: Int!
     totalSearched: Int!
+    validationState: RecipeRunValidationState
+    validationUrl: String
     "Total number of warning markers (not committable)."
     warningMarkers: Int!
 }
@@ -1057,6 +1219,8 @@ type RecipeRunTotals {
     totalFilesSearched: Int!
     "Total number of information markers (not committable)."
     totalInfoMarkers: Int!
+    "Total number of repositories still running or yet to be run."
+    totalRepositoriesInProgress: Int!
     "Total number of repositories with markers."
     totalRepositoriesSuccessful: Int!
     "Total number of repositories with errors from the recipe run."
@@ -1095,6 +1259,17 @@ type RecipeSearchEdge {
     node: Recipe
 }
 
+type RepositoryConnection {
+    count: Int
+    edges: [RepositoryEdge]
+    pageInfo: PageInfo
+}
+
+type RepositoryEdge {
+    cursor: String
+    node: Repository
+}
+
 type RepositoryGroup {
     description: String
     name: String!
@@ -1108,8 +1283,12 @@ type RepositoryProvenance {
 }
 
 type ServiceStatistics {
+    "Total number of recipes in the tenant"
     recipeCount: Int!
+    "Total number of repositories in the tenant"
     repositoryCount: Int!
+    "Total number of repositories the calling user can see"
+    userRepositoryCount: Int!
 }
 
 type SshConfiguration {
@@ -1127,6 +1306,15 @@ enum ActionType {
     Delete
     Read
     Update
+}
+
+enum AuditLogFilterColumns {
+    ACTION
+    ACTION_TYPE
+    DESCRIPTION
+    OUTCOME
+    TARGET
+    USER_ID
 }
 
 enum CommitJobOrderField {
@@ -1198,6 +1386,21 @@ enum CommitState {
     PROCESSING
     "A commit that is waiting to be processed."
     QUEUED
+}
+
+enum CommitsReportTaskState {
+    FAILURE
+    PENDING
+    SUCCESS
+}
+
+enum Comparator {
+    CONTAINS
+    ENDS_WITH
+    EQUALS
+    IS_EMPTY
+    NOT_EMPTY
+    STARTS_WITH
 }
 
 enum DataTableFormat {
@@ -1470,6 +1673,11 @@ enum ErrorType {
     UNKNOWN
 }
 
+enum LogicalOperator {
+    AND
+    OR
+}
+
 enum PullRequestState {
     CLOSED
     MERGED
@@ -1533,10 +1741,31 @@ enum RecipeRunSummaryState {
     UNAVAILABLE
 }
 
+enum RecipeRunValidationState {
+    CANCELED
+    ERROR
+    FAIL
+    ORPHANED
+    PASS
+    PENDING
+    QUEUED
+}
+
 enum RecipeSortKey {
     DEFAULT
     NAME
     TOTAL_RECIPES
+}
+
+enum RepositoryFields {
+    BRANCH
+    CHANGESET
+    INGESTED
+    NAME
+    ORGANIZATION
+    ORIGIN
+    PATH
+    WEIGHT
 }
 
 enum ScmType {
@@ -1584,6 +1813,17 @@ The scalar value serializes and parses to a `string`.
 """
 scalar Path
 
+input AuditLogFilterInput {
+    items: [AuditLogFilterItemInput!]!
+    logicalOperator: LogicalOperator = AND
+}
+
+input AuditLogFilterItemInput {
+    comparator: Comparator = CONTAINS
+    field: AuditLogFilterColumns!
+    value: String
+}
+
 input CommitInput {
     "If unset, commit to the branch that the LST was generated from."
     branchName: String
@@ -1627,10 +1867,31 @@ input CommitJobOrderInput {
 }
 
 input EventFilterInput {
+    """
+
+    Limit result set to a specific action
+
+    Example: `GET_RECIPE`
+    """
     action: String
+    "Limit result set to a specific action type"
     actionType: ActionType
+    description: String
+    """
+
+    Limit result set to a specific outcome
+
+    Generally be either: `Success` or `Failed`
+    """
     outcome: String
+    """
+
+    Limit result set to a specific target
+
+    Example: `recipes` or `recipe.runs`
+    """
     target: String
+    "Limit result set to a specific user by id"
     userId: String
 }
 
@@ -1678,6 +1939,21 @@ input RecipeRunInput {
     priority: RecipeRunPriority = NORMAL
     recipe: RecipeInput!
     repositoryFilter: [RepositoryInput!]
+}
+
+input RecipeValidationInput {
+    repositoryFilter: [RepositoryInput!]
+    runId: ID!
+}
+
+input RepositoryFilter {
+    filterBy: RepositoryFields
+    query: String
+    " Used to filter repository groups"
+    repositories: [RepositoryInput]
+    showOrphaned: Boolean = false
+    sortBy: RepositoryFields! = PATH
+    sortOrder: SortOrder! = ASC
 }
 
 input RepositoryInput {

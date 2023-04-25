@@ -1,19 +1,22 @@
 import abc
 import asyncio
 import base64
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
 from typing import List, Any, Dict, Optional, TypeVar, Generic, cast, Union, Type
+from uuid import uuid1, UUID
 
 from gql import gql, Client
 from gql.client import AsyncClientSession
 from gql.transport.aiohttp import AIOHTTPTransport
 from graphql import DocumentNode, ExecutionResult, GraphQLSchema
 
-from .client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance
+from .client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance, RecipeRun, RecipeRunHistory, \
+    Recipe
 from ..campaign.campaign import Campaign
 from ..client.gpg_key_config import GpgKeyConfig
 
@@ -69,15 +72,18 @@ class ModerneClient:
 
     @staticmethod
     def create(moderne_api_token: str, domain: str = "public.moderne.io") -> "ModerneClient":
+        # Some requests can take a very long time, for example, scheduling a recipe run
+        timeout = 60
         client = Client(
             transport=AIOHTTPTransport(
                 url=f"https://api.{domain}/",
                 headers={
                     "Authorization": f'Bearer {moderne_api_token}'
                 },
-                timeout=60,
+                timeout=timeout
             ),
             fetch_schema_from_transport=True,
+            execute_timeout=timeout,
             parse_results=True
         )
 
@@ -85,7 +91,7 @@ class ModerneClient:
             session: AsyncClientSession = None
 
             async def connect(self) -> None:
-                self.session = await client.connect_async(reconnecting=True)
+                self.session = await client.connect_async(reconnecting=True, retry_execute=False)
 
             async def execute(
                     self,
@@ -140,6 +146,15 @@ class ModerneClient:
         :param priority: The priority of the campaign. Can be one of "LOW" or "NORMAL".
         :return: The id of the recipe.
         """
+        # A Hacky Solution:
+        # The `runYamlRecipe` API endpoint can take longer than the Moderne gateway timeout of 60 seconds to respond.
+        # Particularly, when we are launching a recipe run against 30k+ repositories.
+        # When the gateway times out, we don't get the run ID back, so we need an alternate way to get it.
+        #
+        # As such, we embed our own custom 'uuid' in the recipe name, so that we can repeatedly poll the
+        # `previousRecipeRuns` API endpoint to search for our `uuid` and get the run ID,
+        # once the run has actually started.
+        uuid = uuid1()
         run_fix_query = gql(
             # language=GraphQL
             """
@@ -154,12 +169,37 @@ class ModerneClient:
 
         params = {
             "organizationId": target_organization_id,
-            "yaml": campaign.get_recipe_yaml_base_64(),
+            "yaml": campaign.get_recipe_yaml_base_64(uuid),
             "priority": priority
         }
         # Execute the query on the transport
-        result = await self._client.execute(run_fix_query, variable_values=params)
-        return result["runYamlRecipe"]["id"]
+        try:
+            result = await self._client.execute(run_fix_query, variable_values=params)
+            return result["runYamlRecipe"]["id"]
+        except asyncio.exceptions.TimeoutError as error:
+            logging.warning(
+                "The Moderne API timed out on 'runYamlRecipe'. Trying to find the recipe run with uuid %s", uuid
+            )
+            try:
+                return (await self._find_recipe_run_with_uuid(uuid)).runId
+            except ValueError as value_error:
+                raise value_error from error
+
+    async def _find_recipe_run_with_uuid(self, uuid: UUID) -> RecipeRunHistory:
+        total_attempts = 10
+        for attempt in range(0, total_attempts):
+            run_history = await GetPreviousRecipeRunHistory(self._client).get_first_page()
+            for run in run_history:
+                if str(uuid) in run.recipeRun.recipe.name:
+                    return run
+            logging.info(
+                "Attempt[%s/%s]: Could not find recipe run with uuid %s. Trying again in 5 seconds.",
+                attempt + 1,
+                total_attempts,
+                uuid
+            )
+            await asyncio.sleep(5)
+        raise ValueError(f"Could not find recipe run with uuid {uuid}")
 
     async def query_recipe_run_status(self, recipe_run_id: str) -> Dict[str, Any]:
         recipe_run_results = gql(
@@ -372,6 +412,52 @@ class PagedQuery(abc.ABC, Generic[T]):
         """
         paged = self.map_page(await self.request_page(after, **kwargs))
         return [self.map_node(edge["node"]) for edge in paged["edges"]]
+
+
+@dataclass(frozen=True)
+class GetPreviousRecipeRunHistory(PagedQuery[RecipeRunHistory]):
+    query: DocumentNode = field(default=gql(
+        # language=GraphQL
+        """
+        query previousRecipeRunHistory($after: String, $sortOrder: SortOrder = DESC, $filterBy: RecipeRunFilterInput) {
+            previousRecipeRuns(after: $after, sortOrder: $sortOrder, filterBy: $filterBy) {
+                count
+                pageInfo {
+                    hasNextPage
+                    startCursor
+                    endCursor
+                }
+                edges {
+                    node {
+                        runId
+                        recipeRun {
+                            id
+                            recipe {
+                                name
+                                description
+                                tags
+                            }
+                            state
+                        }
+                    }
+                }
+
+            }
+        }
+        """
+    ))
+
+    def map_node(self, node: Dict[str, Any]) -> RecipeRunHistory:
+        node = node.copy()
+        node["recipeRun"]["recipe"] = Recipe(**node["recipeRun"]["recipe"])
+        node["recipeRun"] = RecipeRun(**node["recipeRun"])
+        return RecipeRunHistory(**node)
+
+    def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        return data["previousRecipeRuns"]
+
+    async def get_first_page(self) -> List[RecipeRunHistory]:
+        return await self.get_page_results(None)
 
 
 @dataclass(frozen=True)
