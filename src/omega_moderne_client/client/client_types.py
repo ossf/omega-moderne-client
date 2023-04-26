@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import NamedTuple, List
 
 
 class RecipeRunSummary(NamedTuple):
@@ -16,6 +16,24 @@ class RecipeRunSummary(NamedTuple):
 
 class RecipeRunPerformance(NamedTuple):
     recipeRun: str
+
+
+class RecipeRunHistory(NamedTuple):
+    recipeRun: 'RecipeRun'
+    runId: str
+
+
+class RecipeRun(NamedTuple):
+    id: str
+    recipe: 'Recipe'
+    state: str
+
+
+class Recipe(NamedTuple):
+    id: str
+    name: str
+    tags: List[str]
+    description: str
 
 
 class Repository(NamedTuple):

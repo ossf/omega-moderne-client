@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from importlib.abc import Traversable
 from importlib.resources import files
 from typing import Tuple, List
+from uuid import UUID
 
 import yaml
 from liquid import Template
@@ -24,14 +25,16 @@ class Campaign:
     pr_title: str
     pr_body: str
 
-    def get_recipe_yaml(self) -> str:
+    def get_recipe_yaml(self, uuid: UUID) -> str:
         # language=yaml
         return f"""\
         type: specs.openrewrite.org/v1beta/recipe
-        name: org.jlleitschuh.research.SecurityFixRecipe
+        name: 'org.openssf.research.SecurityFixRecipe (Alpha Omega Identifier: {uuid})'
         displayName: Apply `{self.recipe_id}`
         description: >
          Applies the `{self.recipe_id}` to non-test sources first, if changes are made, then apply to all sources.
+        tags:
+            - security
         applicability:
           anySource:
             - org.openrewrite.java.search.IsLikelyNotTest
@@ -40,8 +43,8 @@ class Campaign:
           - {self.recipe_id}
         """
 
-    def get_recipe_yaml_base_64(self) -> str:
-        return base64.b64encode(self.get_recipe_yaml().encode('utf-8')).decode('utf-8')
+    def get_recipe_yaml_base_64(self, uuid: UUID) -> str:
+        return base64.b64encode(self.get_recipe_yaml(uuid).encode('utf-8')).decode('utf-8')
 
     @classmethod
     def load(cls, name: str) -> 'Campaign':
