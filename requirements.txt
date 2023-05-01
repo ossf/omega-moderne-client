@@ -1,5 +1,5 @@
 setuptools>=67.6.1
-rich~=13.3.4
+rich~=13.3.5
 gql[all]>=3.4.0
 isodate>=0.6.1
 
