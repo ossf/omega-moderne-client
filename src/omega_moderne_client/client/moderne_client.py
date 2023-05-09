@@ -187,20 +187,20 @@ class ModerneClient:
                 raise value_error from error
 
     async def _find_recipe_run_with_uuid(self, uuid: UUID) -> RecipeRunHistory:
-        total_attempts = 10
+        total_attempts = 20
         for attempt in range(0, total_attempts):
             run_history = await GetPreviousRecipeRunHistory(self._client).get_first_page()
             for run in run_history:
                 if str(uuid) in run.recipeRun.recipe.name:
                     return run
-            logging.info(
+            logging.warning(
                 "Attempt[%s/%s]: Could not find recipe run with uuid %s. Trying again in 5 seconds.",
                 attempt + 1,
                 total_attempts,
                 uuid
             )
-            await asyncio.sleep(5)
-        raise ValueError(f"Could not find recipe run with uuid {uuid}")
+            await asyncio.sleep(10)
+        raise ValueError(f"Could not find recipe run with uuid {uuid} after {total_attempts} attempts.")
 
     async def query_recipe_run_status(self, recipe_run_id: str) -> Dict[str, Any]:
         recipe_run_results = gql(
