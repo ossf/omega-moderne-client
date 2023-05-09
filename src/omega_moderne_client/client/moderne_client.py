@@ -73,7 +73,8 @@ class ModerneClient:
     @staticmethod
     def create(moderne_api_token: str, domain: str = "public.moderne.io") -> "ModerneClient":
         # Some requests can take a very long time, for example, scheduling a recipe run
-        timeout = 60
+        # Modernes API will automatically time out after 60 seconds, we need to set a slightly lower timeout
+        timeout = 58
         client = Client(
             transport=AIOHTTPTransport(
                 url=f"https://api.{domain}/",
@@ -433,6 +434,7 @@ class GetPreviousRecipeRunHistory(PagedQuery[RecipeRunHistory]):
                         recipeRun {
                             id
                             recipe {
+                                id
                                 name
                                 description
                                 tags
