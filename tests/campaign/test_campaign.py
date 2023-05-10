@@ -19,7 +19,11 @@ class CachingLinkChecker:
 
     def __init__(self):
         self.session = None
-        self.cache = {}
+        # This is a cache of links to status codes
+        # We pre-populate it with some known good links that have WAFs that often fail to load via automation
+        self.cache = {
+            'https://thenextweb.com/news/comcast-continues-to-inject-its-own-code-into-websites-you-visit': 200,
+        }
 
     async def __aenter__(self) -> 'CachingLinkChecker':
         if not self.session:
