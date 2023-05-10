@@ -189,7 +189,10 @@ class ModerneClient:
     async def _find_recipe_run_with_uuid(self, uuid: UUID) -> RecipeRunHistory:
         total_attempts = 20
         for attempt in range(0, total_attempts):
-            run_history = await GetPreviousRecipeRunHistory(self._client).get_first_page()
+            try:
+                run_history = await GetPreviousRecipeRunHistory(self._client).get_first_page()
+            except asyncio.exceptions.TimeoutError:
+                run_history = []
             for run in run_history:
                 if str(uuid) in run.recipeRun.recipe.name:
                     return run
