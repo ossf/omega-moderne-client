@@ -1,4 +1,4 @@
-# This file was generated based on ".graphqlconfig". Do not edit manually.
+# This file was generated. Do not edit manually.
 
 schema {
     query: Query
@@ -74,11 +74,12 @@ type ArtifactDiagnostics {
     allArtifactsByLocation(
         "Example: `moderne-ingest/moderneinc/cobol-sample-repo/`"
         location: String!
-    ): [AstArtifactRepository]
+    ): [AstArtifactRepositoryDiagnostic]
     "List of artifacts that have been described in the database, but have not had their artifacts downloaded to storage"
     artifactsToDownload: [AstArtifactRepository]
     "The newest artifact we've seen, regardless of whether or not it is downloaded"
     indexableRepositories: [AstRepository!]!
+    listUpdates(modifiedSince: DateTime): [AstArtifact]
 }
 
 type ArtifactStats {
@@ -111,6 +112,12 @@ type Ast {
     weight: Long
 }
 
+type AstArtifact {
+    location: String!
+    timestamp: DateTime!
+    url: String!
+}
+
 type AstArtifactRepository {
     artifactLocation: String
     artifactModified: DateTime
@@ -120,6 +127,20 @@ type AstArtifactRepository {
     buildPluginName: String
     buildPluginVersion: String
     changeset: String
+    origin: String
+    path: String
+}
+
+type AstArtifactRepositoryDiagnostic {
+    artifactLocation: String
+    artifactModified: DateTime
+    artifactRepository: String
+    branch: String
+    buildId: String
+    buildPluginName: String
+    buildPluginVersion: String
+    changeset: String
+    isDownloaded: Boolean
     origin: String
     path: String
 }
@@ -584,6 +605,8 @@ type Mutation {
     cancelRecipeRunValidation(id: ID!): Boolean!
     "Push a branch to the origin remote."
     commit(commit: CommitInput): CommitJob!
+    "Diagnostic mutation to verify copying recipe runs to history."
+    copyRecipeRunsToHistory: Boolean!
     """
 
     Creates a Moderne Personal Access Tokens for authenticating to the Moderne Platform API.
@@ -972,6 +995,12 @@ type Query {
     persisted across service restarts, so this data is only available for a short time.
     """
     latestRecipeDeployments(artifactId: String!, groupId: String!): [RecipeDeploymentResult!]!
+    """
+
+    Return list of jupyter notebooks files names for the specified path.
+    By default would look in the root directory of jupyter server.
+    """
+    listNotebooks(path: String): [String]!
     organization(
         "Filter organizations by id"
         id: ID!
@@ -983,6 +1012,13 @@ type Query {
         "Filter organizations by id"
         id: ID
     ): [Organization!]!
+    """
+
+    Return plugin visualization for specified organization ID and for specified plugin name.
+    Plugin name is the jupyter notebook file name which is located in organizations/{orgId}/{pluginName}.
+    Fetcher will look through the content of the jupyter notebook for the first cell with type code, with not empty outputs with type display_data
+    """
+    pluginVisualization(orgId: String!, pluginName: String!): String
     "Get all recipe runs by a user id (passed via header) sorted by most recent."
     previousRecipeRuns(after: String, before: String, filterBy: RecipeRunFilterInput, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): RecipeRunHistoryConnection!
     pullRequestStatistics(origin: String!, query: String!): [PullRequestStatistics!]!
