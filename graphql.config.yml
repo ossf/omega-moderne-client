@@ -1,0 +1,8 @@
+schema: moderne-api-schema.graphql
+extensions:
+  endpoints:
+    Remote Moderne GraphQL Endpoint:
+      url: https://api.public.moderne.io/
+      headers:
+        Authorization: Bearer ${MODERNE_API_TOKEN}
+      introspect: true
