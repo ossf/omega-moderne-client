@@ -842,6 +842,17 @@ type Mutation {
     unquarantineRepository(repositoryInput: RepositoryInput!): Repository
 }
 
+type NotebookDiagnostics {
+    """
+
+    Return list of jupyter notebooks files names for the specified path.
+    By default would look in the root directory of jupyter server.
+    """
+    listNotebooks(path: String): [String]!
+    "Returns content of the entire notebook located at pathToNotebook. If showOnlyErrors is set to true will display only outputs with type error"
+    wholeNotebook(pathToNotebook: String!, showOnlyErrors: Boolean = false): String
+}
+
 type OAuthConfiguration {
     "The OAuth client ID to use when connecting to this tool."
     clientId: String!
@@ -940,9 +951,8 @@ type Query {
     activeRecipeRuns(limit: Int, sortOrder: SortOrder = DESC): [RecipeRun!]!
     "Paginated result of all Moderne Agents that are presently connected to the Moderne Platform"
     agents: AgentIndexConnection!
-    "Get all currently active recipes for all users, sorted by most recent."
-    allActiveRecipeRuns(limit: Int, sortOrder: SortOrder = DESC): [RecipeRun]! @deprecated(reason: "Use allRecipeRuns instead.")
     allCommitJobs(after: String, first: Int = 50): CommitJobConnection!
+    allOrganizations: [Organization!]!
     "Get all recipe runs sorted by most recent."
     allRecipeRuns(after: String, before: String, filterBy: RecipeRunFilterInput, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): RecipeRunHistoryConnection!
     "Set of diagnostic queries to better understand the state of artifacts in the platform"
@@ -995,12 +1005,7 @@ type Query {
     persisted across service restarts, so this data is only available for a short time.
     """
     latestRecipeDeployments(artifactId: String!, groupId: String!): [RecipeDeploymentResult!]!
-    """
-
-    Return list of jupyter notebooks files names for the specified path.
-    By default would look in the root directory of jupyter server.
-    """
-    listNotebooks(path: String): [String]!
+    notebookDiagnostics: NotebookDiagnostics!
     organization(
         "Filter organizations by id"
         id: ID!

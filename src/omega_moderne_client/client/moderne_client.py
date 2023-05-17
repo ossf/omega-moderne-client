@@ -190,7 +190,7 @@ class ModerneClient:
         total_attempts = 20
         for attempt in range(0, total_attempts):
             try:
-                run_history = await GetPreviousRecipeRunHistory(self._client).get_first_page()
+                run_history = await GetAllRecipeRunHistory(self._client).get_first_page()
             except asyncio.exceptions.TimeoutError:
                 run_history = []
             for run in run_history:
@@ -419,12 +419,12 @@ class PagedQuery(abc.ABC, Generic[T]):
 
 
 @dataclass(frozen=True)
-class GetPreviousRecipeRunHistory(PagedQuery[RecipeRunHistory]):
+class GetAllRecipeRunHistory(PagedQuery[RecipeRunHistory]):
     query: DocumentNode = field(default=gql(
         # language=GraphQL
         """
-        query previousRecipeRunHistory($after: String, $sortOrder: SortOrder = DESC, $filterBy: RecipeRunFilterInput) {
-            previousRecipeRuns(after: $after, sortOrder: $sortOrder, filterBy: $filterBy) {
+        query allRecipeRunHistory($after: String, $sortOrder: SortOrder = DESC, $filterBy: RecipeRunFilterInput) {
+            allRecipeRuns(after: $after, sortOrder: $sortOrder, filterBy: $filterBy, first: 20) {
                 count
                 pageInfo {
                     hasNextPage
@@ -459,7 +459,7 @@ class GetPreviousRecipeRunHistory(PagedQuery[RecipeRunHistory]):
         return RecipeRunHistory(**node)
 
     def map_page(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        return data["previousRecipeRuns"]
+        return data["allRecipeRuns"]
 
     async def get_first_page(self) -> List[RecipeRunHistory]:
         return await self.get_page_results(None)
