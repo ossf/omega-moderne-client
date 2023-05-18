@@ -194,7 +194,7 @@ class ModerneClient:
             except asyncio.exceptions.TimeoutError:
                 run_history = []
             for run in run_history:
-                if str(uuid) in run.recipeRun.recipe.name:
+                if str(uuid) in run.recipeRun.recipe.id:
                     return run
             logging.warning(
                 "Attempt[%s/%s]: Could not find recipe run with uuid %s. Trying again in 5 seconds.",
