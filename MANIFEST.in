@@ -6,7 +6,7 @@ include CONTRIBUTING.md
 include .pylintrc
 include requirements.txt
 include tox.ini
-include .graphqlconfig
+include *.config.yml
 include *.graphql
 recursive-include tests *.py
 recursive-include src/omega_moderne_client *.md *.txt *.yml *.yaml *.liquid

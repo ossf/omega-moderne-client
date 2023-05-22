@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, List, Dict
 
 from .campaign import Campaign
-from ..client.client_types import RecipeRunSummary, Repository
+from ..client.client_types import RecipeRunSummary, Repository, RepositoryInput
 from ..client.gpg_key_config import GpgKeyConfig
 from ..client.moderne_client import ModerneClient
 
@@ -14,10 +14,18 @@ class CampaignExecutor:
     client: ModerneClient
     progress_monitor: 'CampaignExecutorProgressMonitor'
 
-    async def launch_recipe(self, campaign: Campaign, target_organization_id="Default"):
-        run_id = await self.client.run_campaign(
+    async def launch_recipe_against_organization_id(self, campaign: Campaign, target_organization_id: str = "Default"):
+        run_id = await self.client.run_organization_campaign(
             campaign,
             target_organization_id=target_organization_id
+        )
+        self.progress_monitor.on_recipe_run_started(run_id)
+        return run_id
+
+    async def launch_recipe_against_repositories(self, campaign: Campaign, repository_filter: List[RepositoryInput]):
+        run_id = await self.client.run_custom_filter_campaign(
+            campaign,
+            repository_filter=repository_filter
         )
         self.progress_monitor.on_recipe_run_started(run_id)
         return run_id

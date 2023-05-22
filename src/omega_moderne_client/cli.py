@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import base64
 import json
+import re
 import sys
 from dataclasses import dataclass
 from typing import Dict, Any, List
@@ -29,7 +30,7 @@ from omega_moderne_client.campaign.campaign import Campaign
 from omega_moderne_client.campaign.campaign_executor import CampaignExecutor, PrintingCampaignExecutorProgressMonitor
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
 from omega_moderne_client.client.moderne_client import ModerneClient
-from omega_moderne_client.client.client_types import RecipeRunSummary, Repository
+from omega_moderne_client.client.client_types import RecipeRunSummary, Repository, RepositoryInput
 from omega_moderne_client.repository_filter import Filter, FilterDetailedReason, FilterReason
 from omega_moderne_client.util import verbose_timedelta, headers
 
@@ -165,10 +166,16 @@ async def run_recipe_maybe_generate_prs(args):
         executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
 
         console.print(f"Running campaign {campaign.name}...")
-        run_id = await executor.launch_recipe(
-            campaign=campaign,
-            target_organization_id=args.moderne_organization
-        )
+        if args.repository_filter:
+            run_id = await executor.launch_recipe_against_repositories(
+                campaign=campaign,
+                repository_filter=args.repository_filter
+            )
+        else:
+            run_id = await executor.launch_recipe_against_organization_id(
+                campaign=campaign,
+                target_organization_id=args.moderne_organization
+            )
         recipe_execution_result = await executor.await_recipe(run_id=run_id)
 
         repository_filter = Filter.create_all()
@@ -255,6 +262,21 @@ def cli():
 
     subparsers = parser.add_subparsers(title="actions")
 
+    pattern = re.compile(r'^(?P<origin>[^/]+)/(?P<owner>[^/]+)/(?P<repo>[^@]+)(@(?P<branch>.+))?$')
+
+    def create_repository_input(arg_value) -> RepositoryInput:
+        match = pattern.match(arg_value)
+        if not match:
+            raise argparse.ArgumentTypeError(
+                f"Invalid Repository Filter {arg_value}."
+                " Must be of format `origin/owner/repo[@branch]`"
+            )
+        return RepositoryInput(
+            origin=match.group('origin'),
+            path=match.group('owner') + '/' + match.group('repo'),
+            branch=match.group('branch') or 'main'
+        )
+
     def add_recipe_args(subparser):
         subparser.add_argument(
             'campaign_id',
@@ -262,11 +284,22 @@ def cli():
             choices=Campaign.list_campaigns(),
             help='The campaign to to run.'
         )
-        subparser.add_argument(
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument(
             '--moderne-organization',
             type=str,
             default='Default',
             help='The Moderne SaaS organization ID to run the campaign under. Defaults to `Default`.'
+        )
+        group.add_argument(
+            '--repository-filter',
+            type=create_repository_input,
+            action='append',
+            help='Filter repositories to run the campaign against. ' +
+                 escape('Must be of format `origin/owner/repo[@branch]`. ') +
+                 'For example: `github.com/openrewrite/rewrite`. '
+                 'If a branch is not specified, `main` is used. '
+                 'Can be specified multiple times.'
         )
         subparser.set_defaults(func=run_recipe_maybe_generate_prs)
 

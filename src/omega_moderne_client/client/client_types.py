@@ -45,6 +45,12 @@ class Repository(NamedTuple):
         return f"https://{self.origin}/{self.path}"
 
 
+class RepositoryInput(NamedTuple):
+    origin: str
+    path: str
+    branch: str
+
+
 class Commit(NamedTuple):
     modified: str
     repository: Repository

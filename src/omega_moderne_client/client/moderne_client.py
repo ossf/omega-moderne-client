@@ -16,7 +16,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from graphql import DocumentNode, ExecutionResult, GraphQLSchema
 
 from .client_types import RecipeRunSummary, Repository, Commit, RecipeRunPerformance, RecipeRun, RecipeRunHistory, \
-    Recipe
+    Recipe, RepositoryInput
 from ..campaign.campaign import Campaign
 from ..client.gpg_key_config import GpgKeyConfig
 
@@ -138,8 +138,12 @@ class ModerneClient:
     ) -> None:
         await self.close()
 
-    async def run_campaign(self, campaign: Campaign, target_organization_id: str = "Default",
-                           priority: str = "LOW") -> str:
+    async def run_organization_campaign(
+            self,
+            campaign: Campaign,
+            target_organization_id: str = "Default",
+            priority: str = "LOW"
+    ) -> str:
         """
         Runs a campaign on the target organization.
         :param campaign: The campaign to execute.
@@ -204,6 +208,35 @@ class ModerneClient:
             )
             await asyncio.sleep(10)
         raise ValueError(f"Could not find recipe run with uuid {uuid} after {total_attempts} attempts.")
+
+    async def run_custom_filter_campaign(
+            self,
+            campaign: Campaign,
+            repository_filter: List[RepositoryInput],
+            priority: str = "LOW"
+    ) -> str:
+        run_fix_query = gql(
+            # language=GraphQL
+            """
+            mutation runSecurityFix(
+                $repositoryFilter: [RepositoryInput!],
+                $yaml: Base64!,
+                $priority: RecipeRunPriority
+            ) {
+              runYamlRecipe(repositoryFilter: $repositoryFilter, yaml: $yaml, priority: $priority) {
+                id
+                start
+              }
+            }
+            """
+        )
+        params = {
+            "repositoryFilter": [f._asdict() for f in repository_filter],
+            "yaml": campaign.get_recipe_yaml_base_64(uuid1()),
+            "priority": priority
+        }
+        result = await self._client.execute(run_fix_query, variable_values=params)
+        return result["runYamlRecipe"]["id"]
 
     async def query_recipe_run_status(self, recipe_run_id: str) -> Dict[str, Any]:
         recipe_run_results = gql(
