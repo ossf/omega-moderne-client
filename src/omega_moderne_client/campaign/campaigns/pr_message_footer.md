@@ -7,8 +7,6 @@ First question, do we need to perform vulnerability disclosure? It depends!
 1. Is the vulnerable code only in tests or example code? No disclosure required!
 2. Is the vulnerable code in code shipped to your end users? Vulnerability disclosure is probably required!
 
-For partial path traversal, consider if user-supplied input could ever flow to this logic. If user-supplied input could reach this conditional, it's  insufficient and, as such, most likely a vulnerability.
-
 ## Vulnerability Disclosure How-To
 
 You have a few options to perform vulnerability disclosure. However, I'd like to suggest the following 2 options:
@@ -21,23 +19,17 @@ You have a few options to perform vulnerability disclosure. However, I'd like to
 
 ## Why didn't you disclose privately (ie. coordinated disclosure)?
 
-This PR was automatically generated, in-bulk, and sent to this project as well as many others, all at the same time.
+This pull request (PR) was automatically generated.
 
-This is technically what is called a "Full Disclosure" in vulnerability disclosure, and I agree it's less than ideal.
-If GitHub offered a way to create private pull requests to submit pull requests, I'd leverage it, but that infrastructure, sadly, doesn't exist yet.
+This is technically what is called "Full Disclosure" in vulnerability disclosure terminology, and I agree it's less than ideal. Currently, GitHub, GitLab, and BitBucket do not have support for private pull requests that can be opened by security researchers via an API, therefore, this is a stop gap process until the functionality is available.
 
-The problem is that, as an open source software security researcher, I (exactly like open source maintainers), only have so much time in a day.
-I'm able to find vulnerabilities impacting hundreds, or sometimes thousands of open source projects with tools like GitHub Code Search and CodeQL.
-The problem is that my knowledge of vulnerabilities doesn't scale very well.
+As an open source security researcher, or even as a maintainer, there is limited time in the day. A single vulnerability could impact hundreds, or even thousands of open source projects. With tools like GitHub Code Search and CodeQL, this simplifies the identification and detection process, however, it is based on knowledge of vulnerabilities. This does not scale well.
 
-Individualized vulnerability disclosure takes time and care.
-It's a long and tedious process, and I have a significant amount of experience with it (I have over 50 CVEs to my name).
-Even tracking down the reporting channel (email, Jira, etc..) can take time and isn't automatable.
-Unfortunately, when facing problems of this scale, individual reporting doesn't work well either.
+There are several known challenges to open source security research, such as it's a long and tedious process that must be performed with time and care. Tracking individuals via email, JIRA, and bat signals also takes time, research, and isn't an automate-able process. As we study and design ways to automate at scale, individual reporting is also an issue, where security researchers do not wish to spam emails or issues, nor overwhelm already overly tax maintainers. This is not our goal.
 
-Additionally, if I just spam out emails or issues, I'll just overwhelm already over-taxed maintainers, I don't want to do this either.
+Additionally, if we just spam out emails or issues, we’ll just overwhelm already over-taxed maintainers. We don't want to do this either.
 
-By creating a pull request, I am aiming to provide maintainers something highly actionable to actually fix the identified vulnerability; a pull request.
+By creating a pull request, we aim to provide maintainers a highly actionable way to fix the identified vulnerability, quickly, via a pull request.
 
 There's a larger discussion on this topic that can be found here: https://github.com/JLLeitschuh/security-research/discussions/12
 
