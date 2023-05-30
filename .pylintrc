@@ -1,6 +1,9 @@
 [FORMAT]
 max-line-length=120
 
+[DESIGN]
+max-statements=100
+
 [MESSAGES CONTROL]
 disable=
     missing-module-docstring,

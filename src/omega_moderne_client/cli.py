@@ -137,7 +137,7 @@ class ConsolePrintingCampaignExecutorProgressMonitor(PrintingCampaignExecutorPro
         ))
 
     def print(self, *args):
-        console.log(*(escape(arg) for arg in args))
+        console.log(*(escape(arg) if isinstance(arg, str) else arg for arg in args))
 
 
 def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[FilterDetailedReason]]):
@@ -153,6 +153,17 @@ def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[Filt
                 reverse_reason_map[reason.reason] = root.add(reason.reason.name, style="bold red")
             reverse_reason_map[reason.reason].add(f"{repository} ({reason.details})")
     console.print(root)
+
+
+async def create_pull_request_for_recipe_results(campaign, executor, filtered_recipe_execution_result):
+    gpg_key_config = GpgKeyConfig.load_from_env()
+    console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
+    commit_id = await executor.launch_pull_request(
+        campaign,
+        gpg_key_config,
+        filtered_recipe_execution_result
+    )
+    await executor.await_pull_request(commit_id=commit_id)
 
 
 async def run_recipe_maybe_generate_prs(args):
@@ -186,14 +197,7 @@ async def run_recipe_maybe_generate_prs(args):
             console.print("Generate prs not enabled. Complete!")
             sys.exit(0)
 
-        gpg_key_config = GpgKeyConfig.load_from_env()
-        console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
-        commit_id = await executor.launch_pull_request(
-            campaign,
-            gpg_key_config,
-            filtered_recipe_execution_result
-        )
-        await executor.await_pull_request(commit_id=commit_id)
+        await create_pull_request_for_recipe_results(campaign, executor, filtered_recipe_execution_result)
 
 
 async def recipe_attach(args):
@@ -205,6 +209,14 @@ async def recipe_attach(args):
         repository_filter = Filter.create_all()
         filtered_recipe_execution_result = repository_filter.filter_repositories(recipe_execution_result)
         print_recipe_filter_reason(filtered_recipe_execution_result.filtered_repositories)
+
+        if not args.generate_prs:
+            console.print("Generate prs not enabled. Complete!")
+            sys.exit(0)
+
+        campaign = Campaign.load(args.campaign_id)
+
+        await create_pull_request_for_recipe_results(campaign, executor, filtered_recipe_execution_result)
 
 
 async def pr_attach(args):
@@ -277,13 +289,16 @@ def cli():
             branch=match.group('branch') or 'main'
         )
 
-    def add_recipe_args(subparser):
+    def add_campaign_id_argument(subparser):
         subparser.add_argument(
             'campaign_id',
             type=str,
             choices=Campaign.list_campaigns(),
             help='The campaign to to run.'
         )
+
+    def add_recipe_args(subparser):
+        add_campaign_id_argument(subparser)
         group = subparser.add_mutually_exclusive_group()
         group.add_argument(
             '--moderne-organization',
@@ -332,6 +347,22 @@ def cli():
         help='The Moderne recipe execution id run to attach to.'
     )
     recipe_attach_parser.set_defaults(func=recipe_attach)
+
+    recipe_attach_and_pull_request_parser = subparsers.add_parser(
+        'recipe-attach-and-run-pull-request',
+        help='Attach to a running recipe execution, then generate pull requests from it.',
+        formatter_class=RichHelpFormatter,
+        parents=[parent],
+    )
+    add_campaign_id_argument(recipe_attach_and_pull_request_parser)
+    recipe_attach_and_pull_request_parser.add_argument(
+        'run_id',
+        type=str,
+        help='The Moderne recipe execution id run to attach to.'
+    )
+    recipe_attach_and_pull_request_parser.set_defaults(generate_prs=True)
+    recipe_attach_and_pull_request_parser.set_defaults(func=recipe_attach)
+
     pr_attach_parser = subparsers.add_parser(
         'pr-attach',
         help='Attach to a running pull request execution.',
@@ -343,6 +374,7 @@ def cli():
         type=str,
         help='The Moderne commit id to attach to.'
     )
+    pr_attach_parser.set_defaults(func=pr_attach)
 
     campaign_printer_parser = subparsers.add_parser(
         'campaign',

@@ -65,7 +65,7 @@ class CampaignExecutor:
 
     async def await_pull_request(self, commit_id: str):
         while True:
-            job_state = await self.client.query_commit_job_with_summary(commit_id)
+            job_state = await self.client.query_commit_job_status(commit_id)
             state = job_state["state"]
             self.progress_monitor.on_pull_request_generation_progress(commit_id, state, job_state["commits"])
             if state != "RUNNING":

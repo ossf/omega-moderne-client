@@ -339,7 +339,7 @@ class ModerneClient:
                 "message": campaign.commit_title,
                 "extendedMessage": base64.b64encode(campaign.commit_extended.encode()).decode(),
                 "recipeRunId": recipe_id,
-                "repositories": repositories
+                "repositories": [r._asdict() for r in repositories]
             },
             "organization": "BulkSecurityGeneratorProjectV2",  # TODO: Make this configurable
             "pullRequestTitle": campaign.pr_title,
@@ -358,6 +358,7 @@ class ModerneClient:
             query getCommitJob($id: ID!) {
                 commitJob(id: $id) {
                     id
+                    state
                     completed
                     summaryResults {
                         count
