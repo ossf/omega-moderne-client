@@ -31,7 +31,8 @@ from omega_moderne_client.campaign.campaign_executor import CampaignExecutor, Pr
 from omega_moderne_client.client.gpg_key_config import GpgKeyConfig
 from omega_moderne_client.client.moderne_client import ModerneClient
 from omega_moderne_client.client.client_types import RecipeRunSummary, Repository, RepositoryInput
-from omega_moderne_client.repository_filter import Filter, FilterDetailedReason, FilterReason
+from omega_moderne_client.repository_filter import Filter, FilterDetailedReason, FilterReason, \
+    FilteredRecipeExecutionResult
 from omega_moderne_client.util import verbose_timedelta, headers
 
 console = Console()
@@ -155,8 +156,14 @@ def print_recipe_filter_reason(filtered_repositories: Dict[Repository, List[Filt
     console.print(root)
 
 
-async def create_pull_request_for_recipe_results(campaign, executor, filtered_recipe_execution_result):
-    gpg_key_config = GpgKeyConfig.load_from_env()
+async def create_pull_request_for_recipe_results(
+        gpg_key_config: GpgKeyConfig,
+        campaign: Campaign,
+        executor: CampaignExecutor,
+        filtered_recipe_execution_result: FilteredRecipeExecutionResult
+):
+    if not isinstance(gpg_key_config, GpgKeyConfig):
+        raise ValueError("GPG key config must be provided to create pull requests")
     console.print(f"Forking and creating pull requests for campaign {campaign.name}...")
     commit_id = await executor.launch_pull_request(
         campaign,
@@ -168,9 +175,11 @@ async def create_pull_request_for_recipe_results(campaign, executor, filtered_re
 
 async def run_recipe_maybe_generate_prs(args):
     if args.generate_prs:
+        gpg_key_config = GpgKeyConfig.load_from_env()
         console.print("Generate prs enabled. Pull requests will be created!")
     else:
         console.print("Generate prs not enabled. No pull requests will be created!")
+        gpg_key_config = None
 
     campaign = Campaign.load(args.campaign_id)
     async with ModerneClient.load_from_env(args.moderne_domain) as client:
@@ -197,10 +206,20 @@ async def run_recipe_maybe_generate_prs(args):
             console.print("Generate prs not enabled. Complete!")
             sys.exit(0)
 
-        await create_pull_request_for_recipe_results(campaign, executor, filtered_recipe_execution_result)
+        await create_pull_request_for_recipe_results(
+            gpg_key_config,
+            campaign,
+            executor,
+            filtered_recipe_execution_result
+        )
 
 
 async def recipe_attach(args):
+    if args.generate_prs:
+        gpg_key_config = GpgKeyConfig.load_from_env()
+    else:
+        gpg_key_config = None
+
     async with ModerneClient.load_from_env(args.moderne_domain) as client:
         console.print(f"View live on Moderne https://{client.domain}/results/{args.run_id}")
         executor = CampaignExecutor(client, ConsolePrintingCampaignExecutorProgressMonitor(client.domain))
@@ -214,9 +233,14 @@ async def recipe_attach(args):
             console.print("Generate prs not enabled. Complete!")
             sys.exit(0)
 
+        # TODO: Load campaign from recipe execution result instead of args
         campaign = Campaign.load(args.campaign_id)
-
-        await create_pull_request_for_recipe_results(campaign, executor, filtered_recipe_execution_result)
+        await create_pull_request_for_recipe_results(
+            gpg_key_config,
+            campaign,
+            executor,
+            filtered_recipe_execution_result
+        )
 
 
 async def pr_attach(args):
