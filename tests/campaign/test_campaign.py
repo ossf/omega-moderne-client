@@ -23,6 +23,7 @@ class CachingLinkChecker:
         # We pre-populate it with some known good links that have WAFs that often fail to load via automation
         self.cache = {
             'https://thenextweb.com/news/comcast-continues-to-inject-its-own-code-into-websites-you-visit': 200,
+            'https://infosecwriteups.com/want-to-take-over-the-java-ecosystem-all-you-need-is-a-mitm-1fc329d898fb': 200
         }
 
     async def __aenter__(self) -> 'CachingLinkChecker':
