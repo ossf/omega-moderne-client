@@ -292,8 +292,8 @@ def cli():
     parent.add_argument(
         '--moderne-domain',
         type=str,
-        default='public.moderne.io',
-        help='The Moderne SaaS domain to communicate with. Defaults to `public.moderne.io`.'
+        default='app.moderne.io',
+        help='The Moderne SaaS domain to communicate with. Defaults to `app.moderne.io`.'
     )
 
     subparsers = parser.add_subparsers(title="actions")

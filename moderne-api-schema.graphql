@@ -69,17 +69,26 @@ type AgentIndexEdge {
 
 type ArtifactDiagnostics {
     "All artifacts associated with a repository"
-    allArtifacts(repository: RepositoryInput!): [AstArtifactRepository]
+    allArtifacts(olderThan: DateTime, repository: RepositoryInput!): [AstArtifactRepository]
     "All artifacts associated with a location"
     allArtifactsByLocation(
         "Example: `moderne-ingest/moderneinc/cobol-sample-repo/`"
-        location: String!
+        location: String!,
+        olderThan: DateTime
     ): [AstArtifactRepositoryDiagnostic]
     "List of artifacts that have been described in the database, but have not had their artifacts downloaded to storage"
     artifactsToDownload: [AstArtifactRepository]
     "The newest artifact we've seen, regardless of whether or not it is downloaded"
     indexableRepositories: [AstRepository!]!
+    latestMavenArtifactByLocation(location: String!): AstArtifact
+    latestMavenArtifacts: [AstArtifact]
     listUpdates(modifiedSince: DateTime): [AstArtifact]
+    mavenIndexProperties: [MavenIndexProperty]
+    "Repository count of ingested artifacts that have not been downloaded"
+    repositoryCount(
+        "Example: `2023-07-01T00:00:00Z`"
+        olderThan: DateTime
+    ): Int
 }
 
 type ArtifactStats {
@@ -563,6 +572,11 @@ type MavenConfiguration implements ToolConfiguration {
     valid: Boolean!
 }
 
+type MavenIndexProperty {
+    properties: [String!]
+    url: String!
+}
+
 type MavenResponseStatus {
     "HTTP response code when calling this Maven repository."
     responseCode: Int!
@@ -603,8 +617,13 @@ type Mutation {
     """
     cancelRecipeRun(id: ID!): ID!
     cancelRecipeRunValidation(id: ID!): Boolean!
+    cancelVisualizationRun(id: ID!): VisualizationRun!
     "Push a branch to the origin remote."
-    commit(commit: CommitInput): CommitJob!
+    commit(
+        commit: CommitInput,
+        "Organization ID that will be used to detect available commit options"
+        orgId: ID
+    ): CommitJob!
     "Diagnostic mutation to verify copying recipe runs to history."
     copyRecipeRunsToHistory: Boolean!
     """
@@ -721,9 +740,12 @@ type Mutation {
         "Valid redirect URI for the associated SCM OAuth app."
         redirectUri: String!
     ): Boolean!
+    flushAgentMavenPomCache: Boolean!
     "Push a branch to a fork."
     forkAndCommit(
         commit: CommitInput,
+        "Organization ID that will be used to detect available commit options"
+        orgId: ID,
         """
 
         If set, the fork will be created in this organization. Otherwise, the fork will be created in the user's
@@ -751,6 +773,8 @@ type Mutation {
         draft: Boolean = false,
         "GitHub only flag to allow maintainers to edit a pull request."
         maintainerCanModify: Boolean = false,
+        "Organization ID that will be used to detect available commit options"
+        orgId: ID,
         """
 
         If set, the fork will be created in this organization. Otherwise, the fork will be created in the user's
@@ -808,13 +832,25 @@ type Mutation {
     ): AstIndexConnection!
     loadRecipes(artifactId: String!, datedSnapshotVersion: String, groupId: String!, trace: Boolean = false, version: String!): RecipeArtifact @deprecated(reason: "use `loadRecipesAsync` instead")
     loadRecipesAsync(artifactId: String!, datedSnapshotVersion: String, groupId: String!, trace: Boolean = false, version: String!): RecipeDeploymentResult!
+    "Load visualizations from a PyPI package repository."
+    loadVisualizations(name: String!, version: String): VisualizationDeploymentResult!
     "Open a pull request from a branch pushed to the origin remote."
     pullRequest(
+        """
+
+        If allowed by the repository, set the pull request to automatically merge after all checks pass.
+        `null` means do not auto-merge.
+        This is "best effort" -- if auto-merge is not enabled on the SCM or the repository, commits will not
+        fail even if this is set.
+        """
+        autoMergeMethod: MergeMethod,
         "Allows to reuse closed/merged pull request. Default to true."
         canRecreateClosedPullRequest: Boolean = true,
         commit: CommitInput,
         "Defaults to false."
         draft: Boolean = false,
+        "Organization ID that will be used to detect available commit options"
+        orgId: ID,
         pullRequestBody: Base64,
         "If unset, the commit message will be used as the pull request title."
         pullRequestTitle: String
@@ -838,19 +874,30 @@ type Mutation {
     "Revoke a specific SCM OAuth token from the platform."
     revokeScmToken(scmServerUrl: String!): Boolean!
     runRecipe(run: RecipeRunInput!): RecipeRun!
+    """
+
+    Creates a new visualization run for a given recipe run and organization. The provided organization
+    must be the same as the organization of the recipe run or contain a superset of its repositories.
+    For example, a recipe run on ALL can serve as a visualization for any organization.
+    """
+    runVisualization(
+        """
+
+        Ephemeral visualizations (ad hoc recipe run visualizations, repository details page)
+        can be deleted a few days after they are created. Non-ephemeral runs
+        should stick around forever until a subsequent run with the same
+        visualization id and organization id is finished.
+        """
+        ephemeral: Boolean! = true,
+        options: [OptionInput!],
+        organizationId: ID!,
+        priority: VisualizationRunPriority = NORMAL,
+        "If recipeRunId is not provided, a new recipe run will be initiated."
+        recipeRunId: String,
+        visualizationId: ID!
+    ): VisualizationRun!
     runYamlRecipe(organizationId: ID, priority: RecipeRunPriority = NORMAL, repositoryFilter: [RepositoryInput!], yaml: Base64!): RecipeRun!
     unquarantineRepository(repositoryInput: RepositoryInput!): Repository
-}
-
-type NotebookDiagnostics {
-    """
-
-    Return list of jupyter notebooks files names for the specified path.
-    By default would look in the root directory of jupyter server.
-    """
-    listNotebooks(path: String): [String]!
-    "Returns content of the entire notebook located at pathToNotebook. If showOnlyErrors is set to true will display only outputs with type error"
-    wholeNotebook(pathToNotebook: String!, showOnlyErrors: Boolean = false): String
 }
 
 type OAuthConfiguration {
@@ -922,6 +969,7 @@ type PageInfo {
 }
 
 type PullRequestOptions implements CommitOptions {
+    autoMergeMethod: MergeMethod
     branchName: String
     canRecreateClosedPullRequest: Boolean!
     draft: Boolean!
@@ -955,6 +1003,8 @@ type Query {
     allOrganizations: [Organization!]!
     "Get all recipe runs sorted by most recent."
     allRecipeRuns(after: String, before: String, filterBy: RecipeRunFilterInput, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): RecipeRunHistoryConnection!
+    "The visualization history, filtered to a particular visualization and/or organization if provided."
+    allVisualizationRunHistory(after: String, before: String, filter: VisualizationRunFilter, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): VisualizationRunConnection!
     "Set of diagnostic queries to better understand the state of artifacts in the platform"
     artifactDiagnostics: ArtifactDiagnostics!
     "Returns the categories with associated recipes or subcategories."
@@ -982,6 +1032,12 @@ type Query {
     has read access to that repository.
     """
     dataTableRepositoryOrigins(dataTable: String!, recipeRunId: ID!): [String!]!
+    """
+
+    List of default commit options for tenant, which is configured in agent config.
+    If agent config doesn't have this option will return all available options.
+    """
+    defaultCommitOptions: [CommitOption!]!
     "Paginated result of events that have been logged"
     events(after: String, filter: EventFilterInput, filters: AuditLogFilterInput, first: Int): EventConnection!
     findRepositories(repositoryQuery: RepositoryInput!): [Repository!]!
@@ -1005,7 +1061,6 @@ type Query {
     persisted across service restarts, so this data is only available for a short time.
     """
     latestRecipeDeployments(artifactId: String!, groupId: String!): [RecipeDeploymentResult!]!
-    notebookDiagnostics: NotebookDiagnostics!
     organization(
         "Filter organizations by id"
         id: ID!
@@ -1017,13 +1072,6 @@ type Query {
         "Filter organizations by id"
         id: ID
     ): [Organization!]!
-    """
-
-    Return plugin visualization for specified organization ID and for specified plugin name.
-    Plugin name is the jupyter notebook file name which is located in organizations/{orgId}/{pluginName}.
-    Fetcher will look through the content of the jupyter notebook for the first cell with type code, with not empty outputs with type display_data
-    """
-    pluginVisualization(orgId: String!, pluginName: String!): String
     "Get all recipe runs by a user id (passed via header) sorted by most recent."
     previousRecipeRuns(after: String, before: String, filterBy: RecipeRunFilterInput, first: Int = 50, last: Int, sortOrder: SortOrder = DESC): RecipeRunHistoryConnection!
     pullRequestStatistics(origin: String!, query: String!): [PullRequestStatistics!]!
@@ -1072,6 +1120,12 @@ type Query {
     tools: [ToolConfiguration!]!
     "Does the current user have access to the repository specified by origin?"
     userHasAccessToRepository(repository: RepositoryInput!): Boolean!
+    verifyToken(origin: String!, scmType: ScmType!): String
+    visualization(id: ID!): Visualization!
+    visualizationCategories(categoryId: ID): [VisualizationCategory!]!
+    visualizationRun(id: ID!): VisualizationRun!
+    "The users visualization history, filtered to a particular visualization and/or organization if provided."
+    visualizationRunHistory(after: String, before: String, filter: VisualizationRunFilter, first: Int = 50, last: Int, organizationId: ID, recipeRunId: ID, sortOrder: SortOrder = DESC, visualizationId: ID): VisualizationRunConnection!
     worker(name: String!): Worker
     "This query returns a list of all active worker nodes processing recipes."
     workers: [Worker!]!
@@ -1084,7 +1138,6 @@ type Recipe {
     description: Markdown
     "Example: `org.openrewrite.java.testing.junit5.IgnoreToDisabled`"
     id: ID!
-    languages: [String!]!
     "Curated list of verified maintainers of the recipe"
     maintainers: [Maintainer!]
     name: Markdown!
@@ -1102,6 +1155,7 @@ type Recipe {
     tags: [String!]!
     timeSavings: Duration
     totalRecipes: Int!
+    visualizations: [Visualization!]!
     yaml: Base64
 }
 
@@ -1158,11 +1212,8 @@ type RecipeRun {
     "The id of the organization the recipe was ran under."
     organizationId: ID
     recipe: Recipe!
-    repositoryFilter: [Repository!]!
     start: DateTime!
     state: RecipeRunState!
-    "Sorted alphabetically by Repository ID"
-    summaryResults: [RecipeRunSummary!]! @deprecated(reason: "Use summaryResultsPages instead.")
     summaryResultsPages(after: String, before: String, filterBy: SummaryResultsFilterInput = {onlyWithResults: false}, first: Int = 100, last: Int, orderBy: SummaryResultsOrderInput = {direction: ASC, field: PATH}): RecipeRunSummaryConnection!
     totals: RecipeRunTotals!
     user: String!
@@ -1190,6 +1241,7 @@ type RecipeRunHistoryEdge {
 
 type RecipeRunPerformance {
     astLoading: Duration
+    dependencyResolution: Duration
     recipeRun: Duration
 }
 
@@ -1231,6 +1283,7 @@ type RecipeRunSummary {
     validationUrl: String
     "Total number of warning markers (not committable)."
     warningMarkers: Int!
+    worker: String
 }
 
 " Pagination Type - Recipe Run Summary"
@@ -1336,6 +1389,106 @@ type SshConfiguration {
     port: Int
 }
 
+type Visualization {
+    dataTable: DataTable!
+    description: Markdown!
+    id: ID!
+    images: [VisualizationImage!]!
+    name: Markdown!
+    options: [Option!]!
+    recipe: Recipe!
+}
+
+type VisualizationArtifact {
+    name: String!
+    version: String!
+    visualizations: [Visualization!]!
+}
+
+type VisualizationCategory {
+    "Categories are sorted alphabetically by name."
+    categories: [VisualizationCategory!]!
+    description: Markdown
+    id: ID!
+    name: Markdown!
+    "Any given category will have either visualizations or sub-categories, but not both."
+    visualizations: [Visualization!]!
+}
+
+type VisualizationDeploymentResult {
+    "Will be set if and only if `state` is `FINISHED`."
+    artifact: VisualizationArtifact
+    id: ID!
+    start: DateTime
+    state: VisualizationDeploymentState!
+    stateMessage: String
+}
+
+type VisualizationImage {
+    contents: Base64!
+    "Height, in pixels, of the image."
+    height: Int
+}
+
+type VisualizationRun {
+    dataTable(rows: Int! = 5): String
+    email: String!
+    id: ID!
+    lastUpdatedDate: DateTime!
+    """
+
+    The whole notebook, including the output. This is not persisted
+    permanently, so is only available for an indeterminate time
+    after the run completes. This is a diagnostic utility for when
+    a notebook's saved output is not enough to debug a problem.
+    """
+    notebook: JSON
+    organizationId: ID!
+    output: JSON
+    priority: VisualizationRunPriority!
+    recipeRunId: ID
+    repositories(after: String, before: String, first: Int = 100, last: Int): VisualizationRunRepositoryConnection!
+    state: VisualizationRunState!
+    stateMessage: String
+    visualization: Visualization!
+}
+
+type VisualizationRunConnection {
+    count: Int
+    edges: [VisualizationRunEdge]
+    pageInfo: PageInfo
+}
+
+type VisualizationRunEdge {
+    cursor: String
+    node: VisualizationRun
+}
+
+" Pagination Type - Recipe Run Summary"
+type VisualizationRunRepositoryConnection {
+    count: Int
+    edges: [VisualizationRunRepositoryEdge]
+    """
+
+    The total count of repositories whose data tables have not been uploaded.
+    This can happen in the event that the recipe run / upload is not complete yet,
+    and also in the case where the recipe run or upload failed for any reason.
+    """
+    missingCount: Int
+    pageInfo: PageInfo
+}
+
+type VisualizationRunRepositoryEdge {
+    cursor: String!
+    node: VisualizationRunRepositorySummary!
+}
+
+type VisualizationRunRepositorySummary {
+    repository: Repository
+    state: VisualizationRunRepositorySummaryState!
+    stateMessage: String
+}
+
 type Worker {
     connectedSince: DateTime!
     name: String!
@@ -1401,6 +1554,7 @@ enum CommitOption {
     Direct
     Fork
     ForkAndPullRequest
+    None
     PullRequest
 }
 
@@ -1719,6 +1873,12 @@ enum LogicalOperator {
     OR
 }
 
+enum MergeMethod {
+    MERGE
+    REBASE
+    SQUASH
+}
+
 enum PullRequestState {
     CLOSED
     MERGED
@@ -1736,6 +1896,7 @@ enum RecipeResultColumnKey {
     AST_LOADING
     BRANCH
     DEBUG_MARKERS
+    DEPENDENCY_RESOLUTION
     ERROR_MARKERS
     ERROR_REASON
     INFO_MARKERS
@@ -1747,6 +1908,7 @@ enum RecipeResultColumnKey {
     TOTAL_RESULTS
     TOTAL_SEARCHED
     WARNING_MARKERS
+    WORKER
 }
 
 enum RecipeRunPriority {
@@ -1763,6 +1925,7 @@ enum RecipeRunState {
 enum RecipeRunSummaryErrorReason {
     FAILED_LOAD_AST
     FAILED_LOAD_RECIPE
+    FAILED_LOAD_SYMMETRIC_KEY
     RECIPE_ERROR
     TIMEOUT
 }
@@ -1821,6 +1984,39 @@ enum SortOrder {
     DESC
 }
 
+enum VisualizationDeploymentState {
+    ERROR
+    FINISHED
+    LOADING
+    QUEUED
+}
+
+enum VisualizationRunPriority {
+    LOW
+    NORMAL
+}
+
+enum VisualizationRunRepositorySummaryState {
+    CANCELED
+    ERROR
+    FINISHED
+    FINISHED_EMPTY
+    QUEUED
+    RUNNING
+}
+
+enum VisualizationRunState {
+    CANCELED
+    COLLECTING_DATA
+    ERROR
+    FINISHED
+    FINISHED_EMPTY
+    QUEUED
+    RECIPE_COMPLETED
+    RUNNING_NOTEBOOK
+    RUNNING_RECIPE
+}
+
 """
 
 `Base64` represents a base64 encoded string.
@@ -1830,6 +2026,7 @@ scalar Base64
 
 scalar Date
 
+"An RFC-3339 compliant DateTime Scalar"
 scalar DateTime
 
 """
@@ -1838,6 +2035,9 @@ String in ISO-8601.
 Example: `PT10S` -> 10 seconds
 """
 scalar Duration
+
+"A JSON scalar"
+scalar JSON
 
 scalar Long
 
@@ -2025,4 +2225,11 @@ input SummaryResultsFilterInput {
 input SummaryResultsOrderInput {
     direction: SortOrder!
     field: RecipeResultColumnKey!
+}
+
+input VisualizationRunFilter {
+    organizationId: ID
+    recipeRunId: ID
+    statuses: [VisualizationRunState]
+    visualizationId: ID
 }

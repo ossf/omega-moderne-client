@@ -22,6 +22,8 @@ from ..client.gpg_key_config import GpgKeyConfig
 
 __all__ = ["ModerneClient"]
 
+DEFAULT_DOMAIN = "app.moderne.io"
+
 
 class ClientWrapper(abc.ABC):
     @abc.abstractmethod
@@ -51,7 +53,7 @@ class ModerneClient:
     _client: ClientWrapper
 
     @classmethod
-    def load_from_env(cls, domain: str = "public.moderne.io") -> "ModerneClient":
+    def load_from_env(cls, domain: str = DEFAULT_DOMAIN) -> "ModerneClient":
         token_file = Path.home().joinpath('.moderne/token.txt')
         api_token: str
         if token_file.exists():
@@ -71,7 +73,7 @@ class ModerneClient:
         return cls.create(api_token, domain=domain)
 
     @staticmethod
-    def create(moderne_api_token: str, domain: str = "public.moderne.io") -> "ModerneClient":
+    def create(moderne_api_token: str, domain: str = DEFAULT_DOMAIN) -> "ModerneClient":
         # Some requests can take a very long time, for example, scheduling a recipe run
         # Modernes API will automatically time out after 60 seconds, we need to set a slightly lower timeout
         timeout = 58
