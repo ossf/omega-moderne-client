@@ -1,3 +1,5 @@
+### This is no longer a maintained repository and documents will be kept for historical tracking.
+
 # Omega Moderne Client
 
 [![CI](https://github.com/ossf/omega-moderne-client/actions/workflows/ci.yml/badge.svg)](https://github.com/ossf/omega-moderne-client/actions/workflows/ci.yml)
